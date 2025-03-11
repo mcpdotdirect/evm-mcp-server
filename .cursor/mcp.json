@@ -1,9 +1,10 @@
 {
   "mcpServers": {
-    "evm": {
-      "command": "node",
+    "mcpEvmServer": {
+      "command": "npx",
       "args": [
-        "${workspaceFolder}/build/index.js"
+        "-y",
+        "@mcpdotdirect/mcp-evm-server@latest"
       ]
     }
   }

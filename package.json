@@ -1,17 +1,17 @@
 {
-  "name": "mcp-evm-server",
+  "name": "@mcpdotdirect/mcp-evm-server",
   "module": "src/index.ts",
   "type": "module",
-  "version": "1.0.0",
+  "version": "1.0.2",
   "description": "MCP EVM Server Implementation",
-  "private": true,
   "scripts": {
     "start": "bun run src/index.ts",
-    "build": "bun build src/index.ts --outdir build --target node",
-    "build:http": "bun build src/server/http-server.ts --outdir build --target node",
+    "build": "bun build src/index.ts --outdir build --target node --format esm",
+    "postbuild": "chmod +x build/index.js",
     "dev": "bun --watch src/index.ts",
     "start:http": "bun run src/server/http-server.ts",
-    "dev:http": "bun --watch src/server/http-server.ts"
+    "dev:http": "bun --watch src/server/http-server.ts",
+    "prepublishOnly": "bun run build"
   },
   "devDependencies": {
     "@types/bun": "latest",
@@ -27,5 +27,28 @@
     "express": "^4.21.2",
     "viem": "^2.23.8",
     "zod": "^3.24.2"
-  }
+  },
+  "bin": {
+    "mcp-evm-server": "./build/index.js"
+  },
+  "files": [
+    "build"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mcpdotdirect/mcp-evm-server.git"
+  },
+  "author": {
+    "name": "mcpdotdirect",
+    "url": "https://github.com/mcpdotdirect"
+  },
+  "bugs": {
+    "url": "https://github.com/mcpdotdirect/mcp-evm-server/issues"
+  },
+  "homepage": "https://github.com/mcpdotdirect/mcp-evm-server#readme",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "main": "./build/index.js"
 }

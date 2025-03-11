@@ -5,6 +5,7 @@ node_modules
 out
 dist
 *.tgz
+.cursor/mcp-example.json
 
 # code coverage
 coverage

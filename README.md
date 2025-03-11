@@ -146,7 +146,7 @@ All services are exposed through a consistent interface of MCP tools and resourc
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/mcp-evm-server.git
+git clone https://github.com/mcpdotdirect/mcp-evm-server.git
 cd mcp-evm-server
 
 # Install dependencies with Bun
