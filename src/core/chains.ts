@@ -30,6 +30,7 @@ import {
   zora,
   aurora,
   canto,
+  flowMainnet
   
   // Testnets
   sepolia,
@@ -52,7 +53,8 @@ import {
   zoraSepolia,
   celoAlfajores,
   goerli,
-  holesky
+  holesky,
+  flowTestnet
 } from 'viem/chains';
 
 // Default configuration values
@@ -91,6 +93,7 @@ export const chainMap: Record<number, Chain> = {
   7777777: zora,
   1313161554: aurora,
   7700: canto,
+  747: flowMainnet
   
   // Testnets
   11155111: sepolia,
@@ -113,7 +116,8 @@ export const chainMap: Record<number, Chain> = {
   999999999: zoraSepolia,
   44787: celoAlfajores,
   5: goerli,
-  17000: holesky
+  17000: holesky,
+  545: flowTestnet
 };
 
 // Map network names to chain IDs for easier reference
@@ -160,6 +164,7 @@ export const networkNameMap: Record<string, number> = {
   'zora': 7777777,
   'aurora': 1313161554,
   'canto': 7700,
+  'flow': 747
   
   // Testnets
   'sepolia': 11155111,
@@ -202,7 +207,8 @@ export const networkNameMap: Record<string, number> = {
   'celoalfajores': 44787,
   'alfajores': 44787,
   'goerli': 5,
-  'holesky': 17000
+  'holesky': 17000,
+  'flow-testnet': 545
 };
 
 // Map chain IDs to RPC URLs
@@ -237,6 +243,7 @@ export const rpcUrlMap: Record<number, string> = {
   7777777: 'https://rpc.zora.energy',
   1313161554: 'https://mainnet.aurora.dev',
   7700: 'https://canto.gravitychain.io',
+  747: 'https://mainnet.evm.nodes.onflow.org'
   
   // Testnets
   11155111: 'https://sepolia.drpc.org',
@@ -259,7 +266,8 @@ export const rpcUrlMap: Record<number, string> = {
   999999999: 'https://sepolia.rpc.zora.energy',
   44787: 'https://alfajores-forno.celo-testnet.org',
   5: 'https://rpc.ankr.com/eth_goerli',
-  17000: 'https://ethereum-holesky.publicnode.com'
+  17000: 'https://ethereum-holesky.publicnode.com',
+  545: 'https://testnet.evm.nodes.onflow.org'
 };
 
 /**
