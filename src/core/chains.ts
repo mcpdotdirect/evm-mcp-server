@@ -32,7 +32,7 @@ import {
   aurora,
   canto,
   flowMainnet,
-  
+
   // Testnets
   sepolia,
   optimismSepolia,
@@ -42,10 +42,10 @@ import {
   avalancheFuji,
   bscTestnet,
   zksyncSepoliaTestnet,
-  lineaSepolia,
-  lumiaTestnet,
-  scrollSepolia,
-  mantleSepoliaTestnet,
+  lineaSepolia, // Added missing import
+  lumiaTestnet, // Added missing import
+  scrollSepolia, // Added missing import
+  mantleSepoliaTestnet, // Added missing import
   mantaSepoliaTestnet,
   blastSepolia,
   fraxtalTestnet,
@@ -56,297 +56,209 @@ import {
   celoAlfajores,
   goerli,
   holesky,
-  flowTestnet
+  flowTestnet,
 } from 'viem/chains';
 
 // Default configuration values
-export const DEFAULT_RPC_URL = 'https://eth.llamarpc.com';
-export const DEFAULT_CHAIN_ID = 1;
+export const DEFAULT_CHAIN_ID = mainnet.id; // Use mainnet ID directly
+export const DEFAULT_RPC_URL = mainnet.rpcUrls.default.http[0]; // Use mainnet default RPC
 
-// Map chain IDs to chains
-export const chainMap: Record<number, Chain> = {
-  // Mainnets
-  1: mainnet,
-  10: optimism,
-  42161: arbitrum,
-  42170: arbitrumNova,
-  8453: base,
-  137: polygon,
-  1101: polygonZkEvm,
-  43114: avalanche,
-  56: bsc,
-  324: zksync,
-  59144: linea,
-  42220: celo,
-  100: gnosis,
-  250: fantom,
-  314: filecoin,
-  1284: moonbeam,
-  1285: moonriver,
-  25: cronos,
-  534352: scroll,
-  5000: mantle,
-  169: manta,
-  994873017: lumiaMainnet,
-  81457: blast,
-  252: fraxtal,
-  34443: mode,
-  1088: metis,
-  255: kroma,
-  7777777: zora,
-  1313161554: aurora,
-  7700: canto,
-  747: flowMainnet,
-  
-  // Testnets
-  11155111: sepolia,
-  11155420: optimismSepolia,
-  421614: arbitrumSepolia,
-  84532: baseSepolia,
-  80002: polygonAmoy,
-  43113: avalancheFuji,
-  97: bscTestnet,
-  300: zksyncSepoliaTestnet,
-  59141: lineaSepolia,
-  1952959480: lumiaTestnet,
-  534351: scrollSepolia,
-  5003: mantleSepoliaTestnet,
-  3441006: mantaSepoliaTestnet,
-  168587773: blastSepolia,
-  2522: fraxtalTestnet,
-  919: modeTestnet,
-  59902: metisSepolia,
-  2358: kromaSepolia,
-  999999999: zoraSepolia,
-  44787: celoAlfajores,
-  5: goerli,
-  17000: holesky,
-  545: flowTestnet,
-};
+// --- Chain Definitions ---
+// Provides a single source of truth for chain configurations.
 
-// Map network names to chain IDs for easier reference
-export const networkNameMap: Record<string, number> = {
-  // Mainnets
-  'ethereum': 1,
-  'mainnet': 1,
-  'eth': 1,
-  'optimism': 10,
-  'op': 10,
-  'arbitrum': 42161,
-  'arb': 42161,
-  'arbitrum-nova': 42170,
-  'arbitrumnova': 42170,
-  'base': 8453,
-  'polygon': 137,
-  'matic': 137,
-  'polygon-zkevm': 1101,
-  'polygonzkevm': 1101,
-  'avalanche': 43114,
-  'avax': 43114,
-  'binance': 56,
-  'bsc': 56,
-  'zksync': 324,
-  'linea': 59144,
-  'celo': 42220,
-  'gnosis': 100,
-  'xdai': 100,
-  'fantom': 250,
-  'ftm': 250,
-  'filecoin': 314,
-  'fil': 314,
-  'moonbeam': 1284,
-  'moonriver': 1285,
-  'cronos': 25,
-  'scroll': 534352,
-  'mantle': 5000,
-  'manta': 169,
-  'lumia': 994873017,
-  'blast': 81457,
-  'fraxtal': 252,
-  'mode': 34443,
-  'metis': 1088,
-  'kroma': 255,
-  'zora': 7777777,
-  'aurora': 1313161554,
-  'canto': 7700,
-  'flow': 747,
-  
-  // Testnets
-  'sepolia': 11155111,
-  'optimism-sepolia': 11155420,
-  'optimismsepolia': 11155420,
-  'arbitrum-sepolia': 421614,
-  'arbitrumsepolia': 421614,
-  'base-sepolia': 84532,
-  'basesepolia': 84532,
-  'polygon-amoy': 80002,
-  'polygonamoy': 80002,
-  'avalanche-fuji': 43113,
-  'avalanchefuji': 43113,
-  'fuji': 43113,
-  'bsc-testnet': 97,
-  'bsctestnet': 97,
-  'zksync-sepolia': 300,
-  'zksyncsepolia': 300,
-  'linea-sepolia': 59141,
-  'lineasepolia': 59141,
-  'lumia-testnet': 1952959480,
-  'scroll-sepolia': 534351,
-  'scrollsepolia': 534351,
-  'mantle-sepolia': 5003,
-  'mantlesepolia': 5003,
-  'manta-sepolia': 3441006,
-  'mantasepolia': 3441006,
-  'blast-sepolia': 168587773,
-  'blastsepolia': 168587773,
-  'fraxtal-testnet': 2522,
-  'fraxtaltestnet': 2522,
-  'mode-testnet': 919,
-  'modetestnet': 919,
-  'metis-sepolia': 59902,
-  'metissepolia': 59902,
-  'kroma-sepolia': 2358,
-  'kromasepolia': 2358,
-  'zora-sepolia': 999999999,
-  'zorasepolia': 999999999,
-  'celo-alfajores': 44787,
-  'celoalfajores': 44787,
-  'alfajores': 44787,
-  'goerli': 5,
-  'holesky': 17000,
-  'flow-testnet': 545,
-};
+interface ChainDefinition {
+  viemChain: Chain;
+  networkNames: string[]; // Primary name first, followed by aliases
+  rpcUrlOverride?: string; // Optional override for the default RPC URL from viemChain
+}
 
-// Map chain IDs to RPC URLs
-export const rpcUrlMap: Record<number, string> = {
+// Define all supported chains here
+const supportedChains: ChainDefinition[] = [
   // Mainnets
-  1: 'https://eth.llamarpc.com',
-  10: 'https://mainnet.optimism.io',
-  42161: 'https://arb1.arbitrum.io/rpc',
-  42170: 'https://nova.arbitrum.io/rpc',
-  8453: 'https://mainnet.base.org',
-  137: 'https://polygon-rpc.com',
-  1101: 'https://zkevm-rpc.com',
-  43114: 'https://api.avax.network/ext/bc/C/rpc',
-  56: 'https://bsc-dataseed.binance.org',
-  324: 'https://mainnet.era.zksync.io',
-  59144: 'https://rpc.linea.build',
-  42220: 'https://forno.celo.org',
-  100: 'https://rpc.gnosischain.com',
-  250: 'https://rpc.ftm.tools',
-  314: 'https://api.node.glif.io/rpc/v1',
-  1284: 'https://rpc.api.moonbeam.network',
-  1285: 'https://rpc.api.moonriver.moonbeam.network',
-  25: 'https://evm.cronos.org',
-  534352: 'https://rpc.scroll.io',
-  5000: 'https://rpc.mantle.xyz',
-  169: 'https://pacific-rpc.manta.network/http',
-  81457: 'https://rpc.blast.io',
-  252: 'https://rpc.frax.com',
-  994873017: 'https://mainnet-rpc.lumia.org',
-  34443: 'https://mainnet.mode.network',
-  1088: 'https://andromeda.metis.io/?owner=1088',
-  255: 'https://api.kroma.network',
-  7777777: 'https://rpc.zora.energy',
-  1313161554: 'https://mainnet.aurora.dev',
-  7700: 'https://canto.gravitychain.io',
-  747: 'https://mainnet.evm.nodes.onflow.org',
-  
+  { viemChain: mainnet, networkNames: ['mainnet', 'ethereum', 'eth'] },
+  { viemChain: optimism, networkNames: ['optimism', 'op'] },
+  { viemChain: arbitrum, networkNames: ['arbitrum', 'arb'] },
+  { viemChain: arbitrumNova, networkNames: ['arbitrum-nova', 'arbitrumnova'] },
+  { viemChain: base, networkNames: ['base'] },
+  { viemChain: polygon, networkNames: ['polygon', 'matic'] },
+  { viemChain: polygonZkEvm, networkNames: ['polygon-zkevm', 'polygonzkevm'] },
+  { viemChain: avalanche, networkNames: ['avalanche', 'avax'] },
+  { viemChain: bsc, networkNames: ['bsc', 'binance'] },
+  { viemChain: zksync, networkNames: ['zksync'] },
+  { viemChain: linea, networkNames: ['linea'] },
+  { viemChain: celo, networkNames: ['celo'] },
+  { viemChain: gnosis, networkNames: ['gnosis', 'xdai'] },
+  { viemChain: fantom, networkNames: ['fantom', 'ftm'] },
+  { viemChain: filecoin, networkNames: ['filecoin', 'fil'] },
+  { viemChain: moonbeam, networkNames: ['moonbeam'] },
+  { viemChain: moonriver, networkNames: ['moonriver'] },
+  { viemChain: cronos, networkNames: ['cronos'] },
+  { viemChain: scroll, networkNames: ['scroll'] },
+  { viemChain: mantle, networkNames: ['mantle'] },
+  { viemChain: manta, networkNames: ['manta'] },
+  { viemChain: lumiaMainnet, networkNames: ['lumia'], rpcUrlOverride: 'https://mainnet-rpc.lumia.org' }, // Example override
+  { viemChain: blast, networkNames: ['blast'] },
+  { viemChain: fraxtal, networkNames: ['fraxtal'] },
+  { viemChain: mode, networkNames: ['mode'] },
+  { viemChain: metis, networkNames: ['metis'] },
+  { viemChain: kroma, networkNames: ['kroma'] },
+  { viemChain: zora, networkNames: ['zora'] },
+  { viemChain: aurora, networkNames: ['aurora'] },
+  { viemChain: canto, networkNames: ['canto'] },
+  { viemChain: flowMainnet, networkNames: ['flow'] },
+
   // Testnets
-  11155111: 'https://sepolia.drpc.org',
-  11155420: 'https://sepolia.optimism.io',
-  421614: 'https://sepolia-rpc.arbitrum.io/rpc',
-  84532: 'https://sepolia.base.org',
-  80002: 'https://rpc-amoy.polygon.technology',
-  43113: 'https://api.avax-test.network/ext/bc/C/rpc',
-  97: 'https://data-seed-prebsc-1-s1.binance.org:8545',
-  300: 'https://sepolia.era.zksync.dev',
-  59141: 'https://rpc.sepolia.linea.build',
-  534351: 'https://sepolia-rpc.scroll.io',
-  5003: 'https://rpc.sepolia.mantle.xyz',
-  3441006: 'https://pacific-rpc.sepolia.manta.network/http',
-  1952959480: 'https://testnet-rpc.lumia.org',
-  168587773: 'https://sepolia.blast.io',
-  2522: 'https://rpc.testnet.frax.com',
-  919: 'https://sepolia.mode.network',
-  59902: 'https://sepolia.metis.io/?owner=59902',
-  2358: 'https://api.sepolia.kroma.network',
-  999999999: 'https://sepolia.rpc.zora.energy',
-  44787: 'https://alfajores-forno.celo-testnet.org',
-  5: 'https://rpc.ankr.com/eth_goerli',
-  17000: 'https://ethereum-holesky.publicnode.com',
-  545: 'https://testnet.evm.nodes.onflow.org',
-};
+  { viemChain: sepolia, networkNames: ['sepolia'] },
+  { viemChain: optimismSepolia, networkNames: ['optimism-sepolia', 'optimismsepolia'] },
+  { viemChain: arbitrumSepolia, networkNames: ['arbitrum-sepolia', 'arbitrumsepolia'] },
+  { viemChain: baseSepolia, networkNames: ['base-sepolia', 'basesepolia'] },
+  { viemChain: polygonAmoy, networkNames: ['polygon-amoy', 'polygonamoy'] },
+  { viemChain: avalancheFuji, networkNames: ['avalanche-fuji', 'avalanchefuji', 'fuji'] },
+  { viemChain: bscTestnet, networkNames: ['bsc-testnet', 'bsctestnet'] },
+  { viemChain: zksyncSepoliaTestnet, networkNames: ['zksync-sepolia', 'zksyncsepolia'] },
+  { viemChain: lineaSepolia, networkNames: ['linea-sepolia', 'lineasepolia'] },
+  { viemChain: lumiaTestnet, networkNames: ['lumia-testnet'], rpcUrlOverride: 'https://testnet-rpc.lumia.org' }, // Example override
+  { viemChain: scrollSepolia, networkNames: ['scroll-sepolia', 'scrollsepolia'] },
+  { viemChain: mantleSepoliaTestnet, networkNames: ['mantle-sepolia', 'mantlesepolia'] },
+  { viemChain: mantaSepoliaTestnet, networkNames: ['manta-sepolia', 'mantasepolia'] },
+  { viemChain: blastSepolia, networkNames: ['blast-sepolia', 'blastsepolia'] },
+  { viemChain: fraxtalTestnet, networkNames: ['fraxtal-testnet', 'fraxtaltestnet'] },
+  { viemChain: modeTestnet, networkNames: ['mode-testnet', 'modetestnet'] },
+  { viemChain: metisSepolia, networkNames: ['metis-sepolia', 'metissepolia'] },
+  { viemChain: kromaSepolia, networkNames: ['kroma-sepolia', 'kromasepolia'] },
+  { viemChain: zoraSepolia, networkNames: ['zora-sepolia', 'zorasepolia'] },
+  { viemChain: celoAlfajores, networkNames: ['celo-alfajores', 'celoalfajores', 'alfajores'] },
+  { viemChain: goerli, networkNames: ['goerli'] },
+  { viemChain: holesky, networkNames: ['holesky'] },
+  { viemChain: flowTestnet, networkNames: ['flow-testnet'] },
+];
+
+// --- Derived Maps (Generated from supportedChains) ---
+
+// Map chain IDs to viem Chain objects
+export const chainMap: Readonly<Record<number, Chain>> = Object.freeze(
+  supportedChains.reduce((map, { viemChain }) => {
+    map[viemChain.id] = viemChain;
+    return map;
+  }, {} as Record<number, Chain>)
+);
+
+// Map network names (lowercase) to chain IDs for easy lookup
+export const networkNameMap: Readonly<Record<string, number>> = Object.freeze(
+  supportedChains.reduce((map, { viemChain, networkNames }) => {
+    networkNames.forEach(name => {
+      map[name.toLowerCase()] = viemChain.id;
+    });
+    return map;
+  }, {} as Record<string, number>)
+);
+
+// Map chain IDs to their primary RPC URL (override or viem default)
+export const rpcUrlMap: Readonly<Record<number, string>> = Object.freeze(
+  supportedChains.reduce((map, { viemChain, rpcUrlOverride }) => {
+    const defaultRpc = viemChain.rpcUrls.default?.http[0];
+    // Prioritize override, then viem default. Fallback handled in getRpcUrl.
+    if (rpcUrlOverride) {
+      map[viemChain.id] = rpcUrlOverride;
+    } else if (defaultRpc) {
+      map[viemChain.id] = defaultRpc;
+    }
+    // If neither override nor viem default exists, it won't be added here.
+    // getRpcUrl will handle the final fallback to DEFAULT_RPC_URL.
+    return map;
+  }, {} as Record<number, string>)
+);
+
+// --- Helper Functions ---
 
 /**
- * Resolves a chain identifier (number or string) to a chain ID
- * @param chainIdentifier Chain ID (number) or network name (string)
- * @returns The resolved chain ID
+ * Resolves a chain identifier (chain ID number or network name string) to a chain ID number.
+ * Throws an error if the identifier cannot be resolved.
+ *
+ * @param chainIdentifier - The chain ID (e.g., 1) or network name (e.g., 'mainnet', 'arbitrum-sepolia'). Case-insensitive for strings.
+ * @returns The resolved chain ID number.
+ * @throws {Error} If the chain identifier is invalid or unsupported.
  */
 export function resolveChainId(chainIdentifier: number | string): number {
   if (typeof chainIdentifier === 'number') {
-    return chainIdentifier;
+    // Check if the numeric ID is actually supported
+    if (chainMap[chainIdentifier]) {
+      return chainIdentifier;
+    } else {
+      throw new Error(`Unsupported chain ID: ${chainIdentifier}`);
+    }
   }
-  
-  // Convert to lowercase for case-insensitive matching
-  const networkName = chainIdentifier.toLowerCase();
-  
-  // Check if the network name is in our map
-  if (networkName in networkNameMap) {
-    return networkNameMap[networkName];
-  }
-  
-  // Try parsing as a number
-  const parsedId = parseInt(networkName);
-  if (!isNaN(parsedId)) {
-    return parsedId;
-  }
-  
-  // Default to mainnet if not found
-  return DEFAULT_CHAIN_ID;
-}
 
-/**
- * Returns the chain configuration for the specified chain ID or network name
- * @param chainIdentifier Chain ID (number) or network name (string)
- * @returns The chain configuration
- * @throws Error if the network is not supported (when string is provided)
- */
-export function getChain(chainIdentifier: number | string = DEFAULT_CHAIN_ID): Chain {
   if (typeof chainIdentifier === 'string') {
     const networkName = chainIdentifier.toLowerCase();
-    // Try to get from direct network name mapping first
-    if (networkNameMap[networkName]) {
-      return chainMap[networkNameMap[networkName]] || mainnet;
+    const chainId = networkNameMap[networkName];
+    if (chainId !== undefined) {
+      return chainId;
     }
-    
-    // If not found, throw an error
-    throw new Error(`Unsupported network: ${chainIdentifier}`);
+
+    // Allow string representation of valid chain IDs (e.g., "1")
+    const parsedId = parseInt(networkName, 10);
+    if (!isNaN(parsedId) && chainMap[parsedId]) {
+      return parsedId;
+    }
   }
-  
-  // If it's a number, return the chain from chainMap
-  return chainMap[chainIdentifier] || mainnet;
+
+  throw new Error(`Invalid or unsupported chain identifier: ${chainIdentifier}`);
 }
 
 /**
- * Gets the appropriate RPC URL for the specified chain ID or network name
- * @param chainIdentifier Chain ID (number) or network name (string)
- * @returns The RPC URL for the specified chain
+ * Retrieves the viem Chain object for a given chain identifier.
+ * Throws an error if the chain is not supported.
+ *
+ * @param chainIdentifier - The chain ID (number) or network name (string).
+ * @returns The viem Chain object.
+ * @throws {Error} If the chain identifier is invalid or unsupported.
  */
-export function getRpcUrl(chainIdentifier: number | string = DEFAULT_CHAIN_ID): string {
-  const chainId = typeof chainIdentifier === 'string' 
-    ? resolveChainId(chainIdentifier) 
-    : chainIdentifier;
-    
-  return rpcUrlMap[chainId] || DEFAULT_RPC_URL;
+export function getChain(chainIdentifier: number | string): Chain {
+  const chainId = resolveChainId(chainIdentifier); // Will throw if invalid/unsupported
+  // We know chainId is valid and exists in chainMap because resolveChainId passed
+  return chainMap[chainId];
 }
 
 /**
- * Get a list of supported networks
- * @returns Array of supported network names (excluding short aliases)
+ * Gets the recommended RPC URL for the specified chain identifier.
+ * Prioritizes overrides, then viem defaults, then the global default.
+ * Throws an error if the chain identifier is invalid or unsupported.
+ *
+ * @param chainIdentifier - The chain ID (number) or network name (string).
+ * @returns The RPC URL string.
+ * @throws {Error} If the chain identifier is invalid or unsupported.
+ */
+export function getRpcUrl(chainIdentifier: number | string): string {
+  const chainId = resolveChainId(chainIdentifier); // Will throw if invalid/unsupported
+
+  // 1. Check our explicit rpcUrlMap (includes overrides and viem defaults if available)
+  if (rpcUrlMap[chainId]) {
+    return rpcUrlMap[chainId];
+  }
+
+  // 2. As a fallback, try the viem chain's default RPC again (might cover cases where rpcUrlMap generation missed it)
+  const chain = chainMap[chainId];
+  const viemDefaultRpc = chain?.rpcUrls.default?.http[0];
+  if (viemDefaultRpc) {
+    console.warn(`Using viem default RPC for chain ${chainId} as no specific URL was found in rpcUrlMap.`);
+    return viemDefaultRpc;
+  }
+
+  // 3. Final fallback to the global default (should ideally not be reached for supported chains)
+  console.warn(`Using global default RPC URL for chain ${chainId} as no specific or viem default URL was found.`);
+  return DEFAULT_RPC_URL;
+}
+
+/**
+ * Gets a sorted list of primary supported network names.
+ * Excludes shorter aliases for brevity.
+ *
+ * @returns An array of primary network name strings.
  */
 export function getSupportedNetworks(): string[] {
-  return Object.keys(networkNameMap)
-    .filter(name => name.length > 2) // Filter out short aliases
-    .sort();
-} 
+  // Return the first name (primary) from each definition's networkNames array
+  return supportedChains
+    .map(def => def.networkNames[0]) // Get primary name
+    .sort(); // Sort alphabetically
+}
