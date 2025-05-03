@@ -66,10 +66,61 @@ export const DEFAULT_RPC_URL = mainnet.rpcUrls.default.http[0]; // Use mainnet d
 // --- Chain Definitions ---
 // Provides a single source of truth for chain configurations.
 
-interface ChainDefinition {
+// Add proper type exports and validation
+export interface ChainDefinition {
   viemChain: Chain;
-  networkNames: string[]; // Primary name first, followed by aliases
-  rpcUrlOverride?: string; // Optional override for the default RPC URL from viemChain
+  networkNames: string[];
+  rpcUrlOverride?: string;
+}
+
+// Add network type validation
+export type NetworkIdentifier = number | string;
+
+// Add RPC URL validation
+export type RpcUrl = string;
+
+// Add proper error types
+export class ChainError extends Error {
+  constructor(
+    message: string,
+    public readonly code: string,
+    public readonly chainIdentifier?: NetworkIdentifier
+  ) {
+    super(message);
+    this.name = 'ChainError';
+  }
+}
+
+// Add validation for RPC URLs
+function validateRpcUrl(url: string): RpcUrl {
+  try {
+    new URL(url);
+    return url;
+  } catch (error) {
+    throw new ChainError(
+      `Invalid RPC URL: ${url}`,
+      'INVALID_RPC_URL',
+      undefined
+    );
+  }
+}
+
+// Add network type validation
+function validateNetworkIdentifier(identifier: NetworkIdentifier): void {
+  if (typeof identifier === 'number' && !Number.isInteger(identifier)) {
+    throw new ChainError(
+      `Invalid chain ID: ${identifier}. Must be an integer.`,
+      'INVALID_CHAIN_ID',
+      identifier
+    );
+  }
+  if (typeof identifier === 'string' && !identifier.trim()) {
+    throw new ChainError(
+      'Network name cannot be empty',
+      'EMPTY_NETWORK_NAME',
+      identifier
+    );
+  }
 }
 
 // Define all supported chains here
@@ -179,14 +230,18 @@ export const rpcUrlMap: Readonly<Record<number, string>> = Object.freeze(
  * @returns The resolved chain ID number.
  * @throws {Error} If the chain identifier is invalid or unsupported.
  */
-export function resolveChainId(chainIdentifier: number | string): number {
+export function resolveChainId(chainIdentifier: NetworkIdentifier): number {
+  validateNetworkIdentifier(chainIdentifier);
+
   if (typeof chainIdentifier === 'number') {
-    // Check if the numeric ID is actually supported
     if (chainMap[chainIdentifier]) {
       return chainIdentifier;
-    } else {
-      throw new Error(`Unsupported chain ID: ${chainIdentifier}`);
     }
+    throw new ChainError(
+      `Unsupported chain ID: ${chainIdentifier}`,
+      'UNSUPPORTED_CHAIN_ID',
+      chainIdentifier
+    );
   }
 
   if (typeof chainIdentifier === 'string') {
@@ -196,14 +251,17 @@ export function resolveChainId(chainIdentifier: number | string): number {
       return chainId;
     }
 
-    // Allow string representation of valid chain IDs (e.g., "1")
     const parsedId = parseInt(networkName, 10);
     if (!isNaN(parsedId) && chainMap[parsedId]) {
       return parsedId;
     }
   }
 
-  throw new Error(`Invalid or unsupported chain identifier: ${chainIdentifier}`);
+  throw new ChainError(
+    `Invalid or unsupported chain identifier: ${chainIdentifier}`,
+    'INVALID_CHAIN_IDENTIFIER',
+    chainIdentifier
+  );
 }
 
 /**
@@ -229,25 +287,22 @@ export function getChain(chainIdentifier: number | string): Chain {
  * @returns The RPC URL string.
  * @throws {Error} If the chain identifier is invalid or unsupported.
  */
-export function getRpcUrl(chainIdentifier: number | string): string {
-  const chainId = resolveChainId(chainIdentifier); // Will throw if invalid/unsupported
+export function getRpcUrl(chainIdentifier: NetworkIdentifier): RpcUrl {
+  const chainId = resolveChainId(chainIdentifier);
 
-  // 1. Check our explicit rpcUrlMap (includes overrides and viem defaults if available)
   if (rpcUrlMap[chainId]) {
-    return rpcUrlMap[chainId];
+    return validateRpcUrl(rpcUrlMap[chainId]);
   }
 
-  // 2. As a fallback, try the viem chain's default RPC again (might cover cases where rpcUrlMap generation missed it)
   const chain = chainMap[chainId];
   const viemDefaultRpc = chain?.rpcUrls.default?.http[0];
   if (viemDefaultRpc) {
     console.warn(`Using viem default RPC for chain ${chainId} as no specific URL was found in rpcUrlMap.`);
-    return viemDefaultRpc;
+    return validateRpcUrl(viemDefaultRpc);
   }
 
-  // 3. Final fallback to the global default (should ideally not be reached for supported chains)
   console.warn(`Using global default RPC URL for chain ${chainId} as no specific or viem default URL was found.`);
-  return DEFAULT_RPC_URL;
+  return validateRpcUrl(DEFAULT_RPC_URL);
 }
 
 /**
