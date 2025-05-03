@@ -150,12 +150,25 @@ app.post("/messages", (req: Request, res: Response) => {
 
 // Add a simple health check endpoint
 app.get("/health", (req: Request, res: Response) => {
-  res.status(200).json({ 
-    status: "ok",
-    server: server ? "initialized" : "initializing",
-    activeConnections: connections.size,
-    connectedSessionIds: Array.from(connections.keys())
-  });
+  const isServerInitialized = !!server;
+  const healthInfo = {
+    // Overall status reflects the core MCP server's readiness
+    status: isServerInitialized ? "healthy" : "initializing", 
+    timestamp: new Date().toISOString(), // Timestamp of the health check
+    mcpServer: {
+      // Explicit state of the MCP server instance
+      status: isServerInitialized ? "initialized" : "initializing",
+    },
+    connections: {
+      // Information about active SSE connections
+      activeCount: connections.size,
+      sessionIds: Array.from(connections.keys())
+    }
+  };
+
+  // Always return 200 OK if the HTTP server itself is running.
+  // The payload indicates the application's internal health state.
+  res.status(200).json(healthInfo);
 });
 
 // Add a root endpoint for basic info

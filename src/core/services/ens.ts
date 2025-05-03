@@ -1288,7 +1288,8 @@ import {
   type Hex,
   type GetEnsResolverParameters,
   type Log,
-  type WriteContractReturnType
+  type WriteContractReturnType,
+  type GetContractReturnType
 } from 'viem';
 import { mainnet } from 'viem/chains';
 import { isAddress } from 'viem';
