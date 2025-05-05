@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>MCP Server</title>
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+  <style>
+    body {
+      background-color: #1a1a1a;
+      color: #ffffff;
+    }
+    .pattern-card {
+      background-color: #2d2d2d;
+      border-radius: 0.5rem;
+      transition: all 0.3s ease;
+    }
+    .pattern-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
+  </style>
+</head>
+<body class="p-4">
+  <div class="container mx-auto">
+    <header class="mb-8">
+      <h1 class="text-3xl font-bold mb-2">MCP Server</h1>
+      <p class="text-gray-400">Model Context Protocol Server for EVM Networks</p>
+    </header>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <!-- Configuration Panel -->
+      <div class="bg-gray-800 p-6 rounded-lg">
+        <h2 class="text-xl font-semibold mb-4">Configuration</h2>
+        <div id="config-form" class="space-y-4">
+          <!-- Configuration form will be populated by JavaScript -->
+        </div>
+      </div>
+
+      <!-- Pattern Recognition Panel -->
+      <div class="bg-gray-800 p-6 rounded-lg">
+        <h2 class="text-xl font-semibold mb-4">Pattern Recognition</h2>
+        <div class="space-y-4">
+          <div class="flex space-x-4">
+            <input type="text" id="text-input" 
+                   class="flex-1 bg-gray-700 rounded px-4 py-2" 
+                   placeholder="Enter text to analyze...">
+            <button id="analyze-btn" 
+                    class="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded">
+              Analyze
+            </button>
+          </div>
+          <div id="analysis-result" class="mt-4">
+            <!-- Analysis results will be displayed here -->
+          </div>
+        </div>
+      </div>
+
+      <!-- Logs Panel -->
+      <div class="bg-gray-800 p-6 rounded-lg md:col-span-2">
+        <h2 class="text-xl font-semibold mb-4">Logs</h2>
+        <div id="logs" class="bg-gray-900 p-4 rounded h-64 overflow-y-auto font-mono text-sm">
+          <!-- Logs will be displayed here -->
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="renderer.js"></script>
+</body>
+</html> 

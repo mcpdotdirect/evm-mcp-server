@@ -27,13 +27,28 @@
     "version:major": "npm version major",
     "release": "npm publish",
     "changelog": "conventional-changelog -p angular -i CHANGELOG.md -s -r 0",
-    "changelog:latest": "conventional-changelog -p angular -r 1 > RELEASE_NOTES.md"
+    "changelog:latest": "conventional-changelog -p angular -r 1 > RELEASE_NOTES.md",
+    "ens-analytics": "bun run src/core/services/ens/scripts/ens-analytics.ts",
+    "ens-monitor": "bun run src/core/services/ens/scripts/ens-monitoring.ts",
+    "build:ens": "bun build src/core/services/ens/scripts/*.ts --outdir build/ens --target node",
+    "electron:dev": "electron .",
+    "electron:build": "electron-builder",
+    "electron:start": "electron-forge start",
+    "electron:package": "electron-forge package",
+    "electron:make": "electron-forge make"
   },
   "devDependencies": {
     "@types/bun": "latest",
     "@types/cors": "^2.8.17",
     "@types/express": "^5.0.0",
-    "conventional-changelog-cli": "^5.0.0"
+    "conventional-changelog-cli": "^5.0.0",
+    "@electron-forge/cli": "^7.2.0",
+    "@electron-forge/maker-deb": "^7.2.0",
+    "@electron-forge/maker-rpm": "^7.2.0",
+    "@electron-forge/maker-squirrel": "^7.2.0",
+    "@electron-forge/maker-zip": "^7.2.0",
+    "electron": "^28.1.0",
+    "typescript": "^5.8.2"
   },
   "peerDependencies": {
     "typescript": "^5.8.2"
@@ -44,7 +59,10 @@
     "express": "^4.21.2",
     "graphql-request": "^7.1.2",
     "viem": "^2.23.9",
-    "zod": "^3.24.2"
+    "zod": "^3.24.2",
+    "lru-cache": "^10.0.0",
+    "limiter": "^2.1.0",
+    "commander": "^11.0.0"
   },
   "keywords": [
     "mcp",
@@ -72,5 +90,26 @@
   "homepage": "https://github.com/mcpdotdirect/evm-mcp-server#readme",
   "publishConfig": {
     "access": "public"
+  },
+  "build": {
+    "appId": "com.mcpdotdirect.evm-mcp-server",
+    "productName": "MCP Server",
+    "directories": {
+      "output": "out"
+    },
+    "files": [
+      "build/**/*",
+      "node_modules/**/*"
+    ],
+    "mac": {
+      "category": "public.app-category.developer-tools"
+    },
+    "win": {
+      "target": "nsis"
+    },
+    "linux": {
+      "target": "AppImage",
+      "category": "Development"
+    }
   }
 }

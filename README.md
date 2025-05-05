@@ -496,3 +496,83 @@ To modify or extend the server:
 ## 📄 License
 
 This project is licensed under the terms of the [MIT License](./LICENSE).
+
+# MCP Server - Electron Application
+
+A desktop application for the Model Context Protocol (MCP) server, providing a user-friendly interface for interacting with EVM networks and managing ENS registrations.
+
+## Features
+
+- Modern, responsive UI built with Tailwind CSS
+- Real-time pattern recognition and analysis
+- Configuration management
+- Comprehensive logging system
+- Cross-platform support (Windows, macOS, Linux)
+
+## Prerequisites
+
+- Node.js (v16 or later)
+- npm or yarn
+- Git
+
+## Installation
+
+1. Clone the repository:
+```bash
+git clone https://github.com/yourusername/evm-mcp-server.git
+cd evm-mcp-server
+```
+
+2. Install dependencies:
+```bash
+npm install
+```
+
+## Development
+
+To run the application in development mode:
+
+```bash
+npm run electron:start
+```
+
+## Building
+
+To build the application for your platform:
+
+```bash
+npm run electron:make
+```
+
+This will create installers in the `out` directory for your current platform.
+
+## Available Scripts
+
+- `npm run electron:start` - Start the application in development mode
+- `npm run electron:package` - Package the application
+- `npm run electron:make` - Create installers for the application
+- `npm run build` - Build the TypeScript files
+- `npm run dev` - Run the development server with hot reloading
+
+## Project Structure
+
+```
+src/
+├── core/                 # Core MCP server functionality
+├── electron/            # Electron main process
+├── renderer/            # Electron renderer process
+├── utils/               # Utility functions
+└── index.ts            # Application entry point
+```
+
+## Contributing
+
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add some amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
+
+## License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
