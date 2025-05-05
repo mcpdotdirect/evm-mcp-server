@@ -31,11 +31,11 @@
     "ens-analytics": "bun run src/core/services/ens/scripts/ens-analytics.ts",
     "ens-monitor": "bun run src/core/services/ens/scripts/ens-monitoring.ts",
     "build:ens": "bun build src/core/services/ens/scripts/*.ts --outdir build/ens --target node",
-    "electron:dev": "electron .",
-    "electron:build": "electron-builder",
-    "electron:start": "electron-forge start",
-    "electron:package": "electron-forge package",
-    "electron:make": "electron-forge make"
+    "electron:dev": "bun run src/electron/index.ts",
+    "electron:build": "bun build src/electron/index.ts --outdir build/electron --target node",
+    "electron:start": "bun run build/electron/index.js",
+    "electron:package": "electron-builder",
+    "electron:make": "electron-builder"
   },
   "devDependencies": {
     "@types/bun": "latest",
@@ -48,7 +48,12 @@
     "@electron-forge/maker-squirrel": "^7.2.0",
     "@electron-forge/maker-zip": "^7.2.0",
     "electron": "^28.1.0",
-    "typescript": "^5.8.2"
+    "typescript": "^5.8.2",
+    "webpack": "^5.89.0",
+    "webpack-cli": "^5.1.4",
+    "ts-loader": "^9.5.1",
+    "style-loader": "^3.3.4",
+    "css-loader": "^6.8.1"
   },
   "peerDependencies": {
     "typescript": "^5.8.2"
