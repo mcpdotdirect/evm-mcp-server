@@ -1,5 +1,5 @@
-import { getEnsTextRecord } from '../records.js';
-import { type Chain } from '../types/index.js';
+import { getEnsTextRecord } from './text-records.js';
+import { type Chain } from './types.js';
 
 interface ScriptOptions {
   name: string;
@@ -16,11 +16,8 @@ function parseArgs(): ScriptOptions {
     const networkArg = process.argv.find(arg => arg.startsWith('--network='));
     const network = networkArg ? networkArg.split('=')[1] : DEFAULT_NETWORK;
 
-    if (!name) {
-      throw new Error('ENS name is required');
-    }
-    if (!key) {
-      throw new Error('Text record key is required');
+    if (!name || !key) {
+      throw new Error('ENS name and key are required');
     }
 
     return { name, key, network };
@@ -34,18 +31,20 @@ function parseArgs(): ScriptOptions {
   }
 }
 
+async function displayTextRecord(name: string, key: string, value: string | null) {
+  console.log(`\nText Record for ${name}:`);
+  console.log('------------------------');
+  console.log(`Key: ${key}`);
+  console.log(`Value: ${value || 'Not set'}`);
+}
+
 async function main() {
   try {
     const { name, key, network } = parseArgs();
     
-    console.log(`\nFetching text record "${key}" for ${name} from ${network}...`);
+    console.log(`\nFetching text record for ${name} from ${network}...`);
     const value = await getEnsTextRecord(name, key, network);
-    
-    if (value) {
-      console.log(`\nText record value: ${value}`);
-    } else {
-      console.log('\nNo text record found for this key');
-    }
+    await displayTextRecord(name, key, value);
   } catch (error) {
     console.error('\nError:', error instanceof Error ? error.message : String(error));
     process.exit(1);

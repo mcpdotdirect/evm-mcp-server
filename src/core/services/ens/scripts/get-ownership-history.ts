@@ -1,4 +1,4 @@
-import { getEnsOwnershipHistory } from './history.js';
+import { getEnsOwnershipHistory } from './ownership.js';
 import { type Chain } from './types.js';
 
 interface ScriptOptions {

@@ -1,4 +1,4 @@
-import { resolveAddress } from './resolution.js';
+import { resolveAddress } from './name-resolution.js';
 import { type Chain } from './types.js';
 import { getPublicClient } from '../../clients.js';
 
@@ -29,6 +29,12 @@ function parseArgs(): ScriptOptions {
   }
 }
 
+async function displayResolvedAddress(name: string, address: string | null) {
+  console.log(`\nResolved Address for ${name}:`);
+  console.log('------------------------');
+  console.log(`Address: ${address || 'Not set'}`);
+}
+
 async function main() {
   try {
     const { name, network } = parseArgs();
@@ -36,12 +42,7 @@ async function main() {
     
     console.log(`\nResolving ${name} on ${network}...`);
     const address = await resolveAddress(name, client);
-    
-    if (address) {
-      console.log(`\nResolved address: ${address}`);
-    } else {
-      console.log('\nNo address found for this ENS name');
-    }
+    await displayResolvedAddress(name, address);
   } catch (error) {
     console.error('\nError:', error instanceof Error ? error.message : String(error));
     process.exit(1);

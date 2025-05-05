@@ -1,26 +1,26 @@
 // Resolution functions
-export { resolveAddress } from './resolution.js';
-export { lookupAddress } from './resolution.js';
-export { isValidEnsName } from './resolution.js';
+export { resolveAddress } from './name-resolution.js';
+export { lookupAddress } from './name-resolution.js';
+export { isValidEnsName } from './name-resolution.js';
 
 // Record functions
-export { getEnsTextRecord } from './records.js';
-export { setEnsTextRecord } from './records.js';
-export { setEnsAddressRecord } from './records.js';
+export { getEnsTextRecord } from './text-records.js';
+export { setEnsTextRecord } from './text-records.js';
+export { setEnsAddressRecord } from './text-records.js';
 
 // Subdomain functions
-export { createEnsSubdomain } from './subdomains.js';
-export { setSubdomainResolver } from './subdomains.js';
-export { isValidSubdomain } from './subdomains.js';
+export { createEnsSubdomain } from './subdomain-management.js';
+export { setSubdomainResolver } from './subdomain-management.js';
+export { isValidSubdomain } from './subdomain-management.js';
 
 // Wrapping functions
-export { wrapEnsName } from './wrapping.js';
-export { unwrapEnsName } from './wrapping.js';
-export { getWrappedNameDetails } from './wrapping.js';
+export { wrapEnsName } from './name-wrapping.js';
+export { unwrapEnsName } from './name-wrapping.js';
+export { getWrappedNameDetails } from './name-wrapping.js';
 
 // History functions
-export { getEnsOwnershipHistory } from './history.js';
-export { getEnsAddressHistory } from './history.js';
+export { getEnsOwnershipHistory } from './ownership.js';
+export { getEnsAddressHistory } from './ownership.js';
 
 // Types
-export type { EnsOwnershipRecord, EnsAddressRecord } from './types/index.js'; 
+export type { EnsOwnershipRecord, EnsAddressRecord } from './types.js'; 
