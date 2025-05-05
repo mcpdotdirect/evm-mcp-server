@@ -5,6 +5,32 @@ import { type PublicClient, type WalletClient } from './types.js';
 import { keccak256, toBytes, randomBytes } from 'viem';
 import { waitForTransaction } from 'viem/actions';
 
+// ENS Resolver ABI
+const RESOLVER_ABI = [
+  {
+    inputs: [
+      { name: 'node', type: 'bytes32' },
+      { name: 'key', type: 'string' },
+      { name: 'value', type: 'string' }
+    ],
+    name: 'setText',
+    outputs: [],
+    stateMutability: 'nonpayable',
+    type: 'function'
+  },
+  {
+    inputs: [
+      { name: 'node', type: 'bytes32' },
+      { name: 'coinType', type: 'uint256' },
+      { name: 'a', type: 'bytes' }
+    ],
+    name: 'setAddr',
+    outputs: [],
+    stateMutability: 'nonpayable',
+    type: 'function'
+  }
+] as const;
+
 // ENS Registrar Controller ABI
 const REGISTRAR_CONTROLLER_ABI = [
   {
@@ -69,8 +95,33 @@ const REGISTRAR_CONTROLLER_ABI = [
   }
 ] as const;
 
-// ENS Registrar Controller address
-const REGISTRAR_CONTROLLER_ADDRESS = '0x283Af0B28c62C092C9727F1Ee09c02CA627EB7F5' as const;
+// ENS Contract Addresses
+const ENS_CONTRACTS = {
+  // Mainnet
+  mainnet: {
+    registrarController: '0x283Af0B28c62C092C9727F1Ee09c02CA627EB7F5',
+    publicResolver: '0x4976fb03C32e5B8cfe2b6cCB31c09Ba78EBaBa41',
+    legacyResolver: '0xdaaf96c344f63131acadd0ea35170e7892d3dfba',
+    defaultResolver: '0x0000000000000000000000000000000000000000',
+    registry: '0x00000000000C2E074eC69A0dFb2997BA6C7d2e1e',
+    reverseRegistrar: '0x084b1c3C81545d370f3634392De611CaaBFf8148',
+    nameWrapper: '0xD4416b13d2b3a9aBae7AcD5D6C2BbDBE25686401',
+    dnsRegistrar: '0x58774Bb8acD458A640aF0B88238369A167546ef2',
+    bulkRenewal: '0x7fDd3f96cBDE51737A9E24b461E7E92A1B9cCf9e'
+  },
+  // Goerli
+  goerli: {
+    registrarController: '0x283Af0B28c62C092C9727F1Ee09c02CA627EB7F5',
+    publicResolver: '0x4B1488B7a6B320d2D721406204aBc3eeAa9AD329',
+    legacyResolver: '0x4B1488B7a6B320d2D721406204aBc3eeAa9AD329',
+    defaultResolver: '0x0000000000000000000000000000000000000000',
+    registry: '0x00000000000C2E074eC69A0dFb2997BA6C7d2e1e',
+    reverseRegistrar: '0x084b1c3C81545d370f3634392De611CaaBFf8148',
+    nameWrapper: '0x114D4603199df73e7D157787f8778E21FdCd723b',
+    dnsRegistrar: '0x8edc487D26F6c8Fa76e032066A3D4F87E273515d',
+    bulkRenewal: '0x7fDd3f96cBDE51737A9E24b461E7E92A1B9cCf9e'
+  }
+} as const;
 
 /**
  * Checks if an ENS name is available for registration
@@ -217,6 +268,66 @@ function weiToEth(wei: bigint): string {
   return (Number(wei) / 1e18).toFixed(4);
 }
 
+/**
+ * Sets a text record for an ENS name
+ * @param name The ENS name
+ * @param key The text record key
+ * @param value The text record value
+ * @param resolver The resolver address
+ * @param walletClient The wallet client to use for the transaction
+ * @returns The transaction hash
+ */
+async function setTextRecord(
+  name: string,
+  key: string,
+  value: string,
+  resolver: `0x${string}`,
+  walletClient: WalletClient
+): Promise<`0x${string}`> {
+  try {
+    const node = namehash(name);
+    const hash = await walletClient.writeContract({
+      address: resolver,
+      abi: RESOLVER_ABI,
+      functionName: 'setText',
+      args: [node, key, value]
+    });
+    return hash;
+  } catch (error) {
+    throw new Error(`Failed to set text record: ${error instanceof Error ? error.message : String(error)}`);
+  }
+}
+
+/**
+ * Sets an address record for an ENS name
+ * @param name The ENS name
+ * @param address The address to set
+ * @param coinType The coin type (0 for ETH)
+ * @param resolver The resolver address
+ * @param walletClient The wallet client to use for the transaction
+ * @returns The transaction hash
+ */
+async function setAddressRecord(
+  name: string,
+  address: `0x${string}`,
+  coinType: number,
+  resolver: `0x${string}`,
+  walletClient: WalletClient
+): Promise<`0x${string}`> {
+  try {
+    const node = namehash(name);
+    const hash = await walletClient.writeContract({
+      address: resolver,
+      abi: RESOLVER_ABI,
+      functionName: 'setAddr',
+      args: [node, BigInt(coinType), address]
+    });
+    return hash;
+  } catch (error) {
+    throw new Error(`Failed to set address record: ${error instanceof Error ? error.message : String(error)}`);
+  }
+}
+
 async function main() {
   console.log('ENS Name Registration Tool');
   console.log('=========================');
@@ -292,9 +403,16 @@ async function main() {
     console.log('Waiting for commitment to be ready (1 minute)...');
     await new Promise(resolve => setTimeout(resolve, 60000));
 
-    // Register name
+    // Register name with public resolver
     console.log('\nRegistering name...');
-    const registrationHash = await registerName(name, owner, durationSeconds, secret, walletClient);
+    const registrationHash = await registerName(
+      name,
+      owner,
+      durationSeconds,
+      secret,
+      walletClient,
+      ENS_CONTRACTS.mainnet.publicResolver
+    );
     console.log(`Registration transaction hash: ${registrationHash}`);
 
     // Wait for registration to be confirmed
@@ -302,8 +420,48 @@ async function main() {
     await waitForTransaction(publicClient, { hash: registrationHash });
     console.log('Registration confirmed!');
 
+    // Set up resolver records
+    console.log('\nSetting up resolver records...');
+    
+    // Set ETH address
+    console.log('Setting ETH address...');
+    const addressHash = await setAddressRecord(
+      name,
+      owner,
+      60, // ETH coin type
+      ENS_CONTRACTS.mainnet.publicResolver,
+      walletClient
+    );
+    await waitForTransaction(publicClient, { hash: addressHash });
+    console.log('ETH address set!');
+
+    // Set common text records
+    const textRecords = {
+      'url': 'https://example.com',
+      'email': 'owner@example.com',
+      'avatar': 'https://example.com/avatar.png',
+      'description': 'My ENS name',
+      'com.twitter': '@example',
+      'com.github': 'example'
+    };
+
+    for (const [key, value] of Object.entries(textRecords)) {
+      console.log(`Setting ${key} record...`);
+      const textHash = await setTextRecord(
+        name,
+        key,
+        value,
+        ENS_CONTRACTS.mainnet.publicResolver,
+        walletClient
+      );
+      await waitForTransaction(publicClient, { hash: textHash });
+      console.log(`${key} record set!`);
+    }
+
     console.log('\nRegistration complete!');
     console.log(`Name ${name} has been registered to ${owner}`);
+    console.log('\nENS Contract Addresses:');
+    console.log(JSON.stringify(ENS_CONTRACTS.mainnet, null, 2));
 
   } catch (error) {
     console.error('Error:', error instanceof Error ? error.message : String(error));
