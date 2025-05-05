@@ -1,5 +1,5 @@
-import { getEnsAddressHistory } from '../history.js';
-import { type Chain } from '../types/index.js';
+import { getEnsAddressHistory } from './history.js';
+import { type Chain } from './types.js';
 
 interface ScriptOptions {
   name: string;

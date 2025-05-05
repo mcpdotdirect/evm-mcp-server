@@ -1,5 +1,5 @@
-import { createEnsSubdomain } from '../subdomains.js';
-import { type Chain } from '../types/index.js';
+import { createEnsSubdomain } from './subdomains.js';
+import { type Chain } from './types.js';
 
 interface ScriptOptions {
   parentName: string;

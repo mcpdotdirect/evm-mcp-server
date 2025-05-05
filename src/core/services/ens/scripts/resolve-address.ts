@@ -1,6 +1,6 @@
-import { resolveAddress } from '../resolution.js';
-import { type Chain } from '../types/index.js';
-import { getPublicClient } from '../../../clients.js';
+import { resolveAddress } from './resolution.js';
+import { type Chain } from './types.js';
+import { getPublicClient } from '../../clients.js';
 
 interface ScriptOptions {
   name: string;
