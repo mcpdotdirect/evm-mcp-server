@@ -23,4 +23,4 @@ export { getEnsOwnershipHistory } from './history.js';
 export { getEnsAddressHistory } from './history.js';
 
 // Types
-export type { EnsOwnershipRecord, EnsAddressRecord } from './types.js'; 
+export type { EnsOwnershipRecord, EnsAddressRecord } from './types/index.js'; 
