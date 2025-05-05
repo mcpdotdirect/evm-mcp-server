@@ -1,9 +1,10 @@
 import { getRecentRegistrations } from '../core/services/ens/ens/records.js';
+import { mainnet } from 'viem/chains';
 
 async function main() {
   try {
     console.log('Fetching recent ENS registrations...');
-    const registrations = await getRecentRegistrations(10);
+    const registrations = await getRecentRegistrations(10, mainnet);
     
     console.log('\nRecent ENS Registrations:');
     console.log('------------------------');
