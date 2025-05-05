@@ -144,4 +144,75 @@ export async function setEnsAddressRecord(
       `Failed to set ENS address record for "${name}". Reason: ${message} [Error Code: SetEnsAddressRecord_General_001]`
     );
   }
+}
+
+/**
+ * Gets the most recent ENS name registrations
+ * @param count The number of recent registrations to fetch (default: 10)
+ * @param network Optional. The target blockchain network. Defaults to Ethereum mainnet.
+ * @returns A Promise that resolves to an array of recent registrations
+ */
+export async function getRecentRegistrations(
+  count: number = 10,
+  network: string | Chain = mainnet
+): Promise<Array<{
+  name: string;
+  owner: Address;
+  blockNumber: bigint;
+  transactionHash: Hash;
+}>> {
+  try {
+    const { publicClient } = await getClients(network);
+    
+    // ENS Registry contract address
+    const registryAddress = '0x00000000000C2E074eC69A0dFb2997BA6C7d2e1e' as const;
+    
+    // Get the latest block number
+    const latestBlock = await publicClient.getBlockNumber();
+    
+    // Query for NewOwner events
+    const logs = await publicClient.getLogs({
+      address: registryAddress,
+      event: {
+        type: 'event',
+        name: 'NewOwner',
+        inputs: [
+          { type: 'bytes32', name: 'node', indexed: true },
+          { type: 'bytes32', name: 'label', indexed: true },
+          { type: 'address', name: 'owner' }
+        ]
+      },
+      fromBlock: latestBlock - BigInt(10000), // Look back 10k blocks
+      toBlock: latestBlock
+    });
+
+    // Process the logs and get the most recent registrations
+    const registrations = await Promise.all(
+      logs.slice(-count).map(async (log) => {
+        const label = log.args.label;
+        const node = log.args.node;
+        const owner = log.args.owner;
+        
+        // Get the name from the label
+        const name = await publicClient.getEnsName({
+          address: owner,
+          blockNumber: log.blockNumber
+        });
+
+        return {
+          name: name || 'unknown.eth',
+          owner: owner,
+          blockNumber: log.blockNumber,
+          transactionHash: log.transactionHash
+        };
+      })
+    );
+
+    return registrations.reverse(); // Return most recent first
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(
+      `Failed to get recent registrations. Reason: ${message} [Error Code: GetRecentRegistrations_General_001]`
+    );
+  }
 } 
