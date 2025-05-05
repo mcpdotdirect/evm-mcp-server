@@ -359,7 +359,9 @@ async function main() {
   }
 
   try {
-    const { publicClient } = await getClients(network === 'mainnet' ? mainnet : goerli);
+    // Get the appropriate chain object
+    const chain = network === 'mainnet' ? mainnet : goerli;
+    const { publicClient } = await getClients(chain);
     const queries = batch ? query.split(',') : [query];
 
     for (const q of queries) {
