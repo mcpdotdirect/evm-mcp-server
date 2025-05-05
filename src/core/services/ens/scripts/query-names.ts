@@ -345,9 +345,16 @@ async function main() {
     console.error('Please provide an ENS name or Ethereum address to query');
     console.error('Usage:');
     console.error('  Query single name/address:');
-    console.error('    bun run query-names.ts [network] <name|address>');
+    console.error('    bun run src/core/services/ens/scripts/query-names.ts [network] <name|address>');
     console.error('  Query multiple names/addresses:');
-    console.error('    bun run query-names.ts [network] <name1|address1,name2|address2,...> --batch');
+    console.error('    bun run src/core/services/ens/scripts/query-names.ts [network] <name1|address1,name2|address2,...> --batch');
+    console.error('\nExamples:');
+    console.error('  Query a single name:');
+    console.error('    bun run src/core/services/ens/scripts/query-names.ts mainnet vitalik.eth');
+    console.error('  Query a single address:');
+    console.error('    bun run src/core/services/ens/scripts/query-names.ts goerli 0x1234...');
+    console.error('  Batch query multiple names:');
+    console.error('    bun run src/core/services/ens/scripts/query-names.ts mainnet vitalik.eth,example.eth --batch');
     process.exit(1);
   }
 
