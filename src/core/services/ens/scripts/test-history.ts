@@ -16,7 +16,7 @@ async function main() {
     console.log('First 3 ownership records:', ownershipHistory.slice(0, 3).map(record => ({
       owner: record.owner,
       timestamp: new Date(record.timestamp * 1000).toISOString(),
-      txHash: record.txHash
+      transactionHash: record.transactionHash
     })));
     
     // Test address history
@@ -25,7 +25,7 @@ async function main() {
     console.log('First 3 address records:', addressHistory.slice(0, 3).map(record => ({
       address: record.address,
       timestamp: new Date(record.timestamp * 1000).toISOString(),
-      txHash: record.txHash
+      transactionHash: record.transactionHash
     })));
     
   } catch (error) {

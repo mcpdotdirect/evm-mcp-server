@@ -45,7 +45,7 @@ async function testHistory(publicClient: any) {
   ownershipHistory.slice(0, 3).forEach((record, i) => {
     console.log(`\n${i + 1}. Owner: ${record.owner}`);
     console.log(`   Timestamp: ${new Date(record.timestamp * 1000).toISOString()}`);
-    console.log(`   Transaction: ${record.txHash}`);
+    console.log(`   Transaction: ${record.transactionHash}`);
   });
   
   // Test address history
@@ -55,7 +55,7 @@ async function testHistory(publicClient: any) {
   addressHistory.slice(0, 3).forEach((record, i) => {
     console.log(`\n${i + 1}. Address: ${record.address}`);
     console.log(`   Timestamp: ${new Date(record.timestamp * 1000).toISOString()}`);
-    console.log(`   Transaction: ${record.txHash}`);
+    console.log(`   Transaction: ${record.transactionHash}`);
   });
 }
 
@@ -80,9 +80,9 @@ async function testNameWrapping(publicClient: any) {
   console.log('\n1. Getting wrapped name details...');
   const details = await getWrappedNameDetails(TEST_NAME, publicClient);
   console.log(`Wrapped name details for ${TEST_NAME}:`);
+  console.log(`Token ID: ${details.tokenId}`);
   console.log(`Owner: ${details.owner}`);
   console.log(`Expiry: ${new Date(details.expiry * 1000).toISOString()}`);
-  console.log(`Fuses: ${details.fuses}`);
 }
 
 async function main() {

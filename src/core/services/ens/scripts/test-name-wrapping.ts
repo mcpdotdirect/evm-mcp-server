@@ -14,9 +14,9 @@ async function main() {
     console.log('\nTesting getWrappedNameDetails...');
     const details = await getWrappedNameDetails(TEST_NAME, publicClient);
     console.log('Wrapped name details:', {
+      tokenId: details.tokenId,
       owner: details.owner,
-      expiry: new Date(details.expiry * 1000).toISOString(),
-      fuses: details.fuses
+      expiry: new Date(details.expiry * 1000).toISOString()
     });
     
   } catch (error) {
