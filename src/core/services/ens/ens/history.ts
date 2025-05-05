@@ -21,7 +21,7 @@ export async function getEnsOwnershipHistory(
     const normalizedEns = normalize(name);
     const { publicClient } = await getClients(network);
     const result = await publicClient.readContract({
-      address: publicClient.address,
+      address: (await import('./utils.js')).ENS_REGISTRY_ADDRESS,
       abi: [
         {
           inputs: [
@@ -46,7 +46,7 @@ export async function getEnsOwnershipHistory(
       functionName: 'getOwnershipHistory',
       args: [namehash(normalizedEns)],
     });
-    return result[0].map((record: any) => ({
+    return (result as any[]).map((record: any) => ({
       owner: record.owner as Address,
       timestamp: Number(record.timestamp),
       transactionHash: record.transactionHash as Hash,
@@ -77,7 +77,7 @@ export async function getEnsAddressHistory(
     const normalizedEns = normalize(name);
     const { publicClient } = await getClients(network);
     const result = await publicClient.readContract({
-      address: publicClient.address,
+      address: (await import('./utils.js')).ENS_REGISTRY_ADDRESS,
       abi: [
         {
           inputs: [
@@ -102,7 +102,7 @@ export async function getEnsAddressHistory(
       functionName: 'getAddressHistory',
       args: [namehash(normalizedEns)],
     });
-    return result[0].map((record: any) => ({
+    return (result as any[]).map((record: any) => ({
       address: record.address as Address,
       timestamp: Number(record.timestamp),
       transactionHash: record.transactionHash as Hash,
