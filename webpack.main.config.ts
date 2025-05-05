@@ -1,12 +1,27 @@
 import type { Configuration } from 'webpack';
-import { rules } from './webpack.rules';
+import path from 'path';
 
-export const mainConfig: Configuration = {
-  entry: './src/electron/main.ts',
+const config: Configuration = {
+  entry: './src/electron/index.ts',
+  target: 'electron-main',
   module: {
-    rules,
+    rules: [
+      {
+        test: /\.ts$/,
+        exclude: /node_modules/,
+        use: {
+          loader: 'ts-loader',
+        },
+      },
+    ],
   },
   resolve: {
-    extensions: ['.js', '.ts', '.jsx', '.tsx', '.css', '.json'],
+    extensions: ['.ts', '.js'],
   },
-}; 
+  output: {
+    path: path.resolve(__dirname, 'build/electron'),
+    filename: 'main.js',
+  },
+};
+
+export default config; 

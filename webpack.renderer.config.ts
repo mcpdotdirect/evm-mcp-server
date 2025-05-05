@@ -1,11 +1,31 @@
 import type { Configuration } from 'webpack';
-import { rules } from './webpack.rules';
+import path from 'path';
 
-export const rendererConfig: Configuration = {
+const config: Configuration = {
+  entry: './src/renderer/renderer.ts',
+  target: 'electron-renderer',
   module: {
-    rules,
+    rules: [
+      {
+        test: /\.ts$/,
+        exclude: /node_modules/,
+        use: {
+          loader: 'ts-loader',
+        },
+      },
+      {
+        test: /\.css$/,
+        use: ['style-loader', 'css-loader'],
+      },
+    ],
   },
   resolve: {
-    extensions: ['.js', '.ts', '.jsx', '.tsx', '.css', '.json'],
+    extensions: ['.ts', '.js', '.css'],
   },
-}; 
+  output: {
+    path: path.resolve(__dirname, 'build/renderer'),
+    filename: 'renderer.js',
+  },
+};
+
+export default config; 

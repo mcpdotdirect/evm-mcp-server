@@ -1,4 +1,4 @@
-import { app, BrowserWindow } from 'electron';
+import { app, BrowserWindow, ipcMain } from 'electron';
 import path from 'path';
 
 let mainWindow: BrowserWindow | null = null;
@@ -8,13 +8,18 @@ function createWindow() {
     width: 1200,
     height: 800,
     webPreferences: {
-      nodeIntegration: true,
-      contextIsolation: false
-    }
+      nodeIntegration: false,
+      contextIsolation: true,
+      preload: path.join(__dirname, '../renderer/preload.js'),
+    },
   });
 
   // Load the index.html file
-  mainWindow.loadFile(path.join(__dirname, '../renderer/index.html'));
+  if (process.env.NODE_ENV === 'development') {
+    mainWindow.loadURL('http://localhost:3000');
+  } else {
+    mainWindow.loadFile(path.join(__dirname, '../renderer/index.html'));
+  }
 
   // Open DevTools in development
   if (process.env.NODE_ENV === 'development') {
