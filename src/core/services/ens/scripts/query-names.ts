@@ -1,6 +1,6 @@
 import { getClients } from '../utils.js';
 import { mainnet, goerli } from 'viem/chains';
-import { type PublicClient } from './types.js';
+import { type PublicClient } from 'viem';
 import { namehash, normalize } from 'viem/ens';
 import { GraphQLClient } from 'graphql-request';
 
@@ -325,8 +325,8 @@ async function getNamesByAddressFromSubgraph(
         }
       }
     `;
-    const result = await client.request(query, { address: address.toLowerCase() });
-    return result.domains.map((domain: { name: string }) => domain.name);
+    const result = await client.request<{ domains: { name: string }[] }>(query, { address: address.toLowerCase() });
+    return result.domains.map(domain => domain.name);
   } catch (error) {
     throw new Error(`Failed to query subgraph: ${error instanceof Error ? error.message : String(error)}`);
   }
@@ -361,7 +361,7 @@ async function main() {
   try {
     // Get the appropriate chain object
     const chain = network === 'mainnet' ? mainnet : goerli;
-    const { publicClient } = await getClients(chain);
+    const { publicClient } = await getClients(network);
     const queries = batch ? query.split(',') : [query];
 
     for (const q of queries) {
