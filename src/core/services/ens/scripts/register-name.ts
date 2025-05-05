@@ -1,7 +1,9 @@
 import { normalize, namehash } from 'viem/ens';
 import { getClients } from '../utils.js';
 import { mainnet } from 'viem/chains';
-import { type PublicClient } from './types.js';
+import { type PublicClient, type WalletClient } from './types.js';
+import { keccak256, toBytes, randomBytes } from 'viem';
+import { waitForTransaction } from 'viem/actions';
 
 // ENS Registrar Controller ABI
 const REGISTRAR_CONTROLLER_ABI = [
@@ -33,11 +35,65 @@ const REGISTRAR_CONTROLLER_ABI = [
     ],
     stateMutability: 'view',
     type: 'function'
+  },
+  {
+    inputs: [
+      { name: 'name', type: 'string' }
+    ],
+    name: 'available',
+    outputs: [
+      { name: '', type: 'bool' }
+    ],
+    stateMutability: 'view',
+    type: 'function'
+  },
+  {
+    inputs: [
+      { name: 'commitment', type: 'bytes32' }
+    ],
+    name: 'makeCommitment',
+    outputs: [],
+    stateMutability: 'nonpayable',
+    type: 'function'
+  },
+  {
+    inputs: [
+      { name: 'commitment', type: 'bytes32' }
+    ],
+    name: 'commitments',
+    outputs: [
+      { name: '', type: 'uint256' }
+    ],
+    stateMutability: 'view',
+    type: 'function'
   }
 ] as const;
 
 // ENS Registrar Controller address
 const REGISTRAR_CONTROLLER_ADDRESS = '0x283Af0B28c62C092C9727F1Ee09c02CA627EB7F5' as const;
+
+/**
+ * Checks if an ENS name is available for registration
+ * @param name The ENS name to check
+ * @param client The public client to use for the query
+ * @returns True if the name is available, false otherwise
+ */
+async function isNameAvailable(
+  name: string,
+  client: PublicClient
+): Promise<boolean> {
+  try {
+    const normalizedName = normalize(name);
+    return await client.readContract({
+      address: REGISTRAR_CONTROLLER_ADDRESS,
+      abi: REGISTRAR_CONTROLLER_ABI,
+      functionName: 'available',
+      args: [normalizedName]
+    });
+  } catch (error) {
+    throw new Error(`Failed to check name availability: ${error instanceof Error ? error.message : String(error)}`);
+  }
+}
 
 /**
  * Estimates the cost of registering an ENS name for a given duration
@@ -64,6 +120,91 @@ async function estimateRegistrationCost(
     return result[0] + result[1];
   } catch (error) {
     throw new Error(`Failed to estimate registration cost: ${error instanceof Error ? error.message : String(error)}`);
+  }
+}
+
+/**
+ * Generates a commitment for name registration
+ * @param name The ENS name to register
+ * @param owner The owner's address
+ * @param secret The secret for the commitment
+ * @returns The commitment hash
+ */
+function generateCommitment(
+  name: string,
+  owner: `0x${string}`,
+  secret: `0x${string}`
+): `0x${string}` {
+  const normalizedName = normalize(name);
+  const label = normalizedName.split('.')[0];
+  const commitment = keccak256(
+    toBytes(
+      `${label}${owner.slice(2)}${secret.slice(2)}`
+    )
+  );
+  return commitment;
+}
+
+/**
+ * Makes a commitment for name registration
+ * @param commitment The commitment hash
+ * @param walletClient The wallet client to use for the transaction
+ * @returns The transaction hash
+ */
+async function makeCommitment(
+  commitment: `0x${string}`,
+  walletClient: WalletClient
+): Promise<`0x${string}`> {
+  try {
+    const hash = await walletClient.writeContract({
+      address: REGISTRAR_CONTROLLER_ADDRESS,
+      abi: REGISTRAR_CONTROLLER_ABI,
+      functionName: 'makeCommitment',
+      args: [commitment]
+    });
+    return hash;
+  } catch (error) {
+    throw new Error(`Failed to make commitment: ${error instanceof Error ? error.message : String(error)}`);
+  }
+}
+
+/**
+ * Registers an ENS name
+ * @param name The ENS name to register
+ * @param owner The owner's address
+ * @param duration The duration in seconds
+ * @param secret The secret for the commitment
+ * @param walletClient The wallet client to use for the transaction
+ * @returns The transaction hash
+ */
+async function registerName(
+  name: string,
+  owner: `0x${string}`,
+  duration: number,
+  secret: `0x${string}`,
+  walletClient: WalletClient
+): Promise<`0x${string}`> {
+  try {
+    const normalizedName = normalize(name);
+    const hash = await walletClient.writeContract({
+      address: REGISTRAR_CONTROLLER_ADDRESS,
+      abi: REGISTRAR_CONTROLLER_ABI,
+      functionName: 'register',
+      args: [
+        normalizedName,
+        owner,
+        BigInt(duration),
+        secret,
+        '0x0000000000000000000000000000000000000000', // Default resolver
+        [], // No data
+        true, // Set reverse record
+        0 // No fuses
+      ],
+      value: await estimateRegistrationCost(name, duration, walletClient)
+    });
+    return hash;
+  } catch (error) {
+    throw new Error(`Failed to register name: ${error instanceof Error ? error.message : String(error)}`);
   }
 }
 
@@ -104,7 +245,16 @@ async function main() {
   const durationSeconds = durationYears * 365 * 24 * 60 * 60;
 
   try {
-    const { publicClient } = await getClients(mainnet);
+    const { publicClient, walletClient } = await getClients(mainnet);
+
+    // Check if name is available
+    console.log('\nChecking name availability...');
+    const available = await isNameAvailable(name, publicClient);
+    if (!available) {
+      console.error(`Name ${name} is not available for registration`);
+      process.exit(1);
+    }
+    console.log('Name is available!');
 
     // Estimate the cost
     console.log('\nEstimating registration cost...');
@@ -115,7 +265,45 @@ async function main() {
     console.log(`Name: ${name}`);
     console.log(`Duration: ${durationYears} year${durationYears > 1 ? 's' : ''}`);
     console.log(`Estimated Cost: ${costEth} ETH (${costWei} wei)`);
-    console.log('\nNote: This is an estimate. The actual cost may vary slightly due to network conditions.');
+
+    // Get owner address
+    const owner = walletClient.account?.address;
+    if (!owner) {
+      console.error('No wallet connected');
+      process.exit(1);
+    }
+
+    // Generate secret and commitment
+    console.log('\nGenerating commitment...');
+    const secret = `0x${randomBytes(32).toString('hex')}`;
+    const commitment = generateCommitment(name, owner, secret);
+
+    // Make commitment
+    console.log('Making commitment transaction...');
+    const commitmentHash = await makeCommitment(commitment, walletClient);
+    console.log(`Commitment transaction hash: ${commitmentHash}`);
+
+    // Wait for commitment to be confirmed
+    console.log('Waiting for commitment to be confirmed...');
+    await waitForTransaction(publicClient, { hash: commitmentHash });
+    console.log('Commitment confirmed!');
+
+    // Wait for commitment to be ready (1 minute)
+    console.log('Waiting for commitment to be ready (1 minute)...');
+    await new Promise(resolve => setTimeout(resolve, 60000));
+
+    // Register name
+    console.log('\nRegistering name...');
+    const registrationHash = await registerName(name, owner, durationSeconds, secret, walletClient);
+    console.log(`Registration transaction hash: ${registrationHash}`);
+
+    // Wait for registration to be confirmed
+    console.log('Waiting for registration to be confirmed...');
+    await waitForTransaction(publicClient, { hash: registrationHash });
+    console.log('Registration confirmed!');
+
+    console.log('\nRegistration complete!');
+    console.log(`Name ${name} has been registered to ${owner}`);
 
   } catch (error) {
     console.error('Error:', error instanceof Error ? error.message : String(error));
