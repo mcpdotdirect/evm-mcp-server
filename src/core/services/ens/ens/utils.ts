@@ -1,4 +1,4 @@
-import { getPublicClient, getWalletClient } from '../clients.js';
+import { getPublicClient, getWalletClient } from '../../clients.js';
 import { type PublicClient, type WalletClient, type Chain } from './types.js';
 import { mainnet } from 'viem/chains';
 
