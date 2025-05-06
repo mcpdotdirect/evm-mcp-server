@@ -3,7 +3,7 @@ import { getSupportedNetworks, getRpcUrl } from "./chains.js";
 import * as services from "./services/index.js";
 import type { Address, Hash } from "viem";
 import type { URL } from "url";
-import { resolveAddress, lookupAddress, isValidEnsName } from "./services/ens/utils.js";
+import { resolveAddress, lookupAddress, isValidEnsName } from "./services/ens/index.js";
 
 interface ResourceParams {
   network?: string;
