@@ -1,7 +1,7 @@
 import type { Configuration } from 'webpack';
 import path from 'path';
 
-const config: Configuration = {
+export const mainConfig: Configuration = {
   entry: './src/electron/index.ts',
   target: 'electron-main',
   module: {
@@ -22,6 +22,4 @@ const config: Configuration = {
     path: path.resolve(__dirname, 'build/electron'),
     filename: 'main.js',
   },
-};
-
-export default config; 
+}; 

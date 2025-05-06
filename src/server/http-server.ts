@@ -28,8 +28,17 @@ app.options('*', cors());
 // Keep track of active connections with session IDs
 const connections = new Map<string, SSEServerTransport>();
 
+// Extend McpServer with required methods
+interface ExtendedMcpServer extends McpServer {
+  name: string;
+  version: string;
+  resource: (name: string, template: string | (new (uri: string, options: { list?: boolean }) => any), handler: (uri: URL, params: any) => Promise<{ contents: any[] }>) => void;
+  tool: (name: string, description: string, params: Record<string, any>, handler: (params: any) => Promise<any>) => void;
+  connect: (transport: any) => Promise<void>;
+}
+
 // Initialize the server
-let server: McpServer | null = null;
+let server: ExtendedMcpServer | null = null;
 startServer().then(s => {
   server = s;
   console.error("MCP Server initialized successfully");

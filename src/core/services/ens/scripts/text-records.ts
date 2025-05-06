@@ -1,6 +1,6 @@
 import { normalize, namehash } from 'viem/ens';
-import { type Address, type Chain, type Hash, type TransactionReceipt } from './types.js';
-import { getClients } from './utils.js';
+import { type Address, type Chain, type Hash, type TransactionReceipt, type PublicClient } from './types.js';
+import { getClients } from '../utils.js';
 import { mainnet } from 'viem/chains';
 import { isAddress } from 'viem';
 
@@ -33,18 +33,17 @@ const RESOLVER_ABI = [
  * Retrieves a specific text record associated with an ENS name.
  * @param name The ENS name to query.
  * @param key The key of the text record to retrieve.
- * @param network Optional. The target blockchain network. Defaults to Ethereum mainnet.
+ * @param client The public client to use for the query.
  * @returns A Promise that resolves to the value of the text record, or null if not set.
  */
 export async function getEnsTextRecord(
   name: string,
   key: string,
-  network: string | Chain = mainnet
+  client: PublicClient
 ): Promise<string | null> {
   try {
     const normalizedEns = normalize(name);
-    const { publicClient } = await getClients(network);
-    return await publicClient.getEnsText({
+    return await client.getEnsText({
       name: normalizedEns,
       key,
     });
@@ -61,22 +60,22 @@ export async function getEnsTextRecord(
  * @param name The ENS name to update.
  * @param key The key of the text record to set.
  * @param value The value to set for the text record, or null to clear it.
- * @param network Optional. The target blockchain network. Defaults to Ethereum mainnet.
+ * @param client The public client to use for the query.
  * @returns A Promise that resolves to the transaction hash of the operation.
  */
 export async function setEnsTextRecord(
   name: string,
   key: string,
   value: string | null,
-  network: string | Chain = mainnet
+  client: PublicClient
 ): Promise<Hash> {
   try {
     const normalizedEns = normalize(name);
-    const { publicClient, walletClient } = await getClients(network);
+    const { walletClient } = await getClients(client.chain);
     if (!walletClient.account) {
       throw new Error('No wallet account available [Error Code: SetEnsTextRecord_NoAccount_001]');
     }
-    const resolverAddress = await publicClient.getEnsResolver({
+    const resolverAddress = await client.getEnsResolver({
       name: normalizedEns,
     });
     return await walletClient.writeContract({
@@ -85,7 +84,7 @@ export async function setEnsTextRecord(
       functionName: 'setText',
       args: [namehash(normalizedEns), key, value || ''],
       account: walletClient.account,
-      chain: walletClient.chain,
+      chain: client.chain,
     });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : String(error);
@@ -99,13 +98,13 @@ export async function setEnsTextRecord(
  * Sets the Ethereum address record for an ENS name.
  * @param name The ENS name to update.
  * @param address The Ethereum address to set, or null to clear it.
- * @param network Optional. The target blockchain network. Defaults to Ethereum mainnet.
+ * @param client The public client to use for the query.
  * @returns A Promise that resolves to the transaction receipt of the operation.
  */
 export async function setEnsAddressRecord(
   name: string,
   address: Address | null,
-  network: string | Chain = mainnet
+  client: PublicClient
 ): Promise<TransactionReceipt> {
   try {
     const normalizedEns = normalize(name);
@@ -114,12 +113,12 @@ export async function setEnsAddressRecord(
         `Invalid Ethereum address: "${address}" [Error Code: SetEnsAddressRecord_InvalidInput_001]`
       );
     }
-    const { walletClient } = await getClients(network);
+    const { walletClient } = await getClients(client.chain);
     if (!walletClient.account) {
       throw new Error('No wallet account available [Error Code: SetEnsAddressRecord_NoAccount_001]');
     }
     const result = await walletClient.writeContract({
-      address: walletClient.address,
+      address: client.address,
       abi: [
         {
           inputs: [
@@ -135,7 +134,7 @@ export async function setEnsAddressRecord(
       functionName: 'setAddr',
       args: [namehash(normalizedEns), address || '0x0000000000000000000000000000000000000000'],
       account: walletClient.account,
-      chain: walletClient.chain,
+      chain: client.chain,
     });
     return result as TransactionReceipt;
   } catch (error: unknown) {
@@ -149,12 +148,12 @@ export async function setEnsAddressRecord(
 /**
  * Gets the most recent ENS name registrations
  * @param count The number of recent registrations to fetch (default: 10)
- * @param network Optional. The target blockchain network. Defaults to Ethereum mainnet.
+ * @param client The public client to use for the query.
  * @returns A Promise that resolves to an array of recent registrations
  */
 export async function getRecentRegistrations(
   count: number = 10,
-  network: string | Chain = mainnet
+  client: PublicClient
 ): Promise<Array<{
   name: string;
   owner: Address;
@@ -162,16 +161,14 @@ export async function getRecentRegistrations(
   transactionHash: Hash;
 }>> {
   try {
-    const { publicClient } = await getClients(network);
-    
     // ENS Registry contract address
     const registryAddress = '0x00000000000C2E074eC69A0dFb2997BA6C7d2e1e' as const;
     
     // Get the latest block number
-    const latestBlock = await publicClient.getBlockNumber();
+    const latestBlock = await client.getBlockNumber();
     
     // Query for NewOwner events
-    const logs = await publicClient.getLogs({
+    const logs = await client.getLogs({
       address: registryAddress,
       event: {
         type: 'event',
@@ -194,7 +191,7 @@ export async function getRecentRegistrations(
         const owner = log.args.owner;
         
         // Get the name from the label
-        const name = await publicClient.getEnsName({
+        const name = await client.getEnsName({
           address: owner,
           blockNumber: log.blockNumber
         });

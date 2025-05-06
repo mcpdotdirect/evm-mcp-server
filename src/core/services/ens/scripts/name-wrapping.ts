@@ -1,5 +1,5 @@
 import { normalize, namehash } from 'viem/ens';
-import { type Address, type Chain, type TransactionReceipt } from './types.js';
+import { type Address, type Chain, type TransactionReceipt, type PublicClient } from './types.js';
 import { getClients } from './utils.js';
 import { mainnet } from 'viem/chains';
 
@@ -92,12 +92,12 @@ export async function unwrapEnsName(
 /**
  * Gets wrapped name details.
  * @param name The ENS name to query.
- * @param network Optional. The target blockchain network. Defaults to Ethereum mainnet.
+ * @param client The public client to use for the query.
  * @returns A Promise that resolves to an object containing tokenId, owner, and expiry.
  */
 export async function getWrappedNameDetails(
   name: string,
-  network: string | Chain = mainnet
+  client: PublicClient
 ): Promise<{
   tokenId: bigint;
   owner: Address;
@@ -105,9 +105,8 @@ export async function getWrappedNameDetails(
 }> {
   try {
     const normalizedEns = normalize(name);
-    const { publicClient } = await getClients(network);
-    const result = await publicClient.readContract({
-      address: publicClient.address,
+    const result = await client.readContract({
+      address: client.address,
       abi: [
         {
           inputs: [

@@ -1,5 +1,5 @@
 import { normalize, labelhash, namehash } from 'viem/ens';
-import { type Address, type Chain, type TransactionReceipt } from './types.js';
+import { type Address, type Chain, type TransactionReceipt, type PublicClient } from './types.js';
 import { getClients } from './utils.js';
 import { mainnet } from 'viem/chains';
 import { isAddress } from 'viem';
@@ -9,14 +9,14 @@ import { isAddress } from 'viem';
  * @param parentName The parent ENS name (e.g., 'example.eth').
  * @param label The subdomain label (e.g., 'sub' for 'sub.example.eth').
  * @param owner The Ethereum address to set as the owner of the subdomain.
- * @param network Optional. The target blockchain network. Defaults to Ethereum mainnet.
+ * @param client The public client to use for the query.
  * @returns A Promise that resolves to the transaction receipt of the operation.
  */
 export async function createEnsSubdomain(
   parentName: string,
   label: string,
   owner: Address,
-  network: string | Chain = mainnet
+  client: PublicClient
 ): Promise<TransactionReceipt> {
   try {
     const normalizedParent = normalize(parentName);
@@ -26,12 +26,12 @@ export async function createEnsSubdomain(
         `Invalid owner address: "${owner}" [Error Code: CreateEnsSubdomain_InvalidInput_001]`
       );
     }
-    const { walletClient } = await getClients(network);
+    const { walletClient } = await getClients(client.chain);
     if (!walletClient.account) {
       throw new Error('No wallet account available [Error Code: CreateEnsSubdomain_NoAccount_001]');
     }
     const result = await walletClient.writeContract({
-      address: walletClient.address,
+      address: client.address,
       abi: [
         {
           inputs: [
@@ -48,7 +48,7 @@ export async function createEnsSubdomain(
       functionName: 'setSubnodeOwner',
       args: [namehash(normalizedParent), labelhash(normalizedLabel), owner],
       account: walletClient.account,
-      chain: walletClient.chain,
+      chain: client.chain,
     });
     return result as TransactionReceipt;
   } catch (error: unknown) {

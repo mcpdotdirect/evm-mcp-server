@@ -42,10 +42,10 @@ import {
   avalancheFuji,
   bscTestnet,
   zksyncSepoliaTestnet,
-  lineaSepolia, // Added missing import
-  lumiaTestnet, // Added missing import
-  scrollSepolia, // Added missing import
-  mantleSepoliaTestnet, // Added missing import
+  lineaSepolia,
+  lumiaTestnet,
+  scrollSepolia,
+  mantleSepoliaTestnet,
   mantaSepoliaTestnet,
   blastSepolia,
   fraxtalTestnet,
@@ -57,20 +57,41 @@ import {
   goerli,
   holesky,
   flowTestnet,
+  optimismGoerli,
+  arbitrumGoerli,
+  baseGoerli,
+  polygonMumbai,
 } from 'viem/chains';
 
 // Default configuration values
-export const DEFAULT_CHAIN_ID = mainnet.id; // Use mainnet ID directly
-export const DEFAULT_RPC_URL = mainnet.rpcUrls.default.http[0]; // Use mainnet default RPC
+export const DEFAULT_CHAIN_ID = mainnet.id;
+export const DEFAULT_RPC_URL = mainnet.rpcUrls.default.http[0];
 
-// --- Chain Definitions ---
-// Provides a single source of truth for chain configurations.
+// Chain metadata interface
+export interface ChainMetadata {
+  name: string;
+  nativeCurrency: {
+    name: string;
+    symbol: string;
+    decimals: number;
+  };
+  blockTime: number; // Average block time in seconds
+  gasLimit: {
+    min: number;
+    max: number;
+    default: number;
+  };
+  isTestnet: boolean;
+  explorerUrl: string;
+  rpcUrls: readonly string[];
+}
 
-// Add proper type exports and validation
+// Enhanced ChainDefinition interface
 export interface ChainDefinition {
   viemChain: Chain;
   networkNames: string[];
   rpcUrlOverride?: string;
+  metadata: ChainMetadata;
 }
 
 // Add network type validation
@@ -123,68 +144,675 @@ function validateNetworkIdentifier(identifier: NetworkIdentifier): void {
   }
 }
 
-// Define all supported chains here
+// Helper function to create chain metadata
+function createChainMetadata(
+  chain: Chain,
+  name: string,
+  nativeCurrency: { name: string; symbol: string; decimals: number },
+  blockTime: number,
+  isTestnet: boolean
+): ChainMetadata {
+  return {
+    name,
+    nativeCurrency,
+    blockTime,
+    gasLimit: {
+      min: 21000,
+      max: 30000000,
+      default: 21000
+    },
+    isTestnet,
+    explorerUrl: chain.blockExplorers?.default?.url || '',
+    rpcUrls: chain.rpcUrls.default.http
+  };
+}
+
+// Define all supported chains with enhanced metadata
 const supportedChains: ChainDefinition[] = [
   // Mainnets
-  { viemChain: mainnet, networkNames: ['mainnet', 'ethereum', 'eth'] },
-  { viemChain: optimism, networkNames: ['optimism', 'op'] },
-  { viemChain: arbitrum, networkNames: ['arbitrum', 'arb'] },
-  { viemChain: arbitrumNova, networkNames: ['arbitrum-nova', 'arbitrumnova'] },
-  { viemChain: base, networkNames: ['base'] },
-  { viemChain: polygon, networkNames: ['polygon', 'matic'] },
-  { viemChain: polygonZkEvm, networkNames: ['polygon-zkevm', 'polygonzkevm'] },
-  { viemChain: avalanche, networkNames: ['avalanche', 'avax'] },
-  { viemChain: bsc, networkNames: ['bsc', 'binance'] },
-  { viemChain: zksync, networkNames: ['zksync'] },
-  { viemChain: linea, networkNames: ['linea'] },
-  { viemChain: celo, networkNames: ['celo'] },
-  { viemChain: gnosis, networkNames: ['gnosis', 'xdai'] },
-  { viemChain: fantom, networkNames: ['fantom', 'ftm'] },
-  { viemChain: filecoin, networkNames: ['filecoin', 'fil'] },
-  { viemChain: moonbeam, networkNames: ['moonbeam'] },
-  { viemChain: moonriver, networkNames: ['moonriver'] },
-  { viemChain: cronos, networkNames: ['cronos'] },
-  { viemChain: scroll, networkNames: ['scroll'] },
-  { viemChain: mantle, networkNames: ['mantle'] },
-  { viemChain: manta, networkNames: ['manta'] },
-  { viemChain: lumiaMainnet, networkNames: ['lumia'], rpcUrlOverride: 'https://mainnet-rpc.lumia.org' }, // Example override
-  { viemChain: blast, networkNames: ['blast'] },
-  { viemChain: fraxtal, networkNames: ['fraxtal'] },
-  { viemChain: mode, networkNames: ['mode'] },
-  { viemChain: metis, networkNames: ['metis'] },
-  { viemChain: kroma, networkNames: ['kroma'] },
-  { viemChain: zora, networkNames: ['zora'] },
-  { viemChain: aurora, networkNames: ['aurora'] },
-  { viemChain: canto, networkNames: ['canto'] },
-  { viemChain: flowMainnet, networkNames: ['flow'] },
+  {
+    viemChain: mainnet,
+    networkNames: ['mainnet', 'ethereum', 'eth'],
+    metadata: createChainMetadata(
+      mainnet,
+      'Ethereum Mainnet',
+      { name: 'Ether', symbol: 'ETH', decimals: 18 },
+      12,
+      false
+    )
+  },
+  {
+    viemChain: optimism,
+    networkNames: ['optimism', 'op'],
+    metadata: createChainMetadata(
+      optimism,
+      'Optimism',
+      { name: 'Ether', symbol: 'ETH', decimals: 18 },
+      2,
+      false
+    )
+  },
+  {
+    viemChain: arbitrum,
+    networkNames: ['arbitrum', 'arb'],
+    metadata: createChainMetadata(
+      arbitrum,
+      'Arbitrum One',
+      { name: 'Ether', symbol: 'ETH', decimals: 18 },
+      0.25,
+      false
+    )
+  },
+  {
+    viemChain: arbitrumNova,
+    networkNames: ['arbitrum-nova', 'arbitrumnova'],
+    metadata: createChainMetadata(
+      arbitrumNova,
+      'Arbitrum Nova',
+      { name: 'Ether', symbol: 'ETH', decimals: 18 },
+      0.25,
+      false
+    )
+  },
+  {
+    viemChain: base,
+    networkNames: ['base'],
+    metadata: createChainMetadata(
+      base,
+      'Base',
+      { name: 'Ether', symbol: 'ETH', decimals: 18 },
+      2,
+      false
+    )
+  },
+  {
+    viemChain: polygon,
+    networkNames: ['polygon', 'matic'],
+    metadata: createChainMetadata(
+      polygon,
+      'Polygon',
+      { name: 'Matic', symbol: 'MATIC', decimals: 18 },
+      2,
+      false
+    )
+  },
+  {
+    viemChain: polygonZkEvm,
+    networkNames: ['polygon-zkevm', 'polygonzkevm'],
+    metadata: createChainMetadata(
+      polygonZkEvm,
+      'Polygon zkEVM',
+      { name: 'Ether', symbol: 'ETH', decimals: 18 },
+      2,
+      false
+    )
+  },
+  {
+    viemChain: avalanche,
+    networkNames: ['avalanche', 'avax'],
+    metadata: createChainMetadata(
+      avalanche,
+      'Avalanche',
+      { name: 'Avalanche', symbol: 'AVAX', decimals: 18 },
+      2,
+      false
+    )
+  },
+  {
+    viemChain: bsc,
+    networkNames: ['bsc', 'binance'],
+    metadata: createChainMetadata(
+      bsc,
+      'BNB Smart Chain',
+      { name: 'BNB', symbol: 'BNB', decimals: 18 },
+      3,
+      false
+    )
+  },
+  {
+    viemChain: zksync,
+    networkNames: ['zksync'],
+    metadata: createChainMetadata(
+      zksync,
+      'zkSync',
+      { name: 'Ether', symbol: 'ETH', decimals: 18 },
+      0.1,
+      false
+    )
+  },
+  {
+    viemChain: linea,
+    networkNames: ['linea'],
+    metadata: createChainMetadata(
+      linea,
+      'Linea',
+      { name: 'Ether', symbol: 'ETH', decimals: 18 },
+      2,
+      false
+    )
+  },
+  {
+    viemChain: celo,
+    networkNames: ['celo'],
+    metadata: createChainMetadata(
+      celo,
+      'Celo',
+      { name: 'Celo', symbol: 'CELO', decimals: 18 },
+      5,
+      false
+    )
+  },
+  {
+    viemChain: gnosis,
+    networkNames: ['gnosis', 'xdai'],
+    metadata: createChainMetadata(
+      gnosis,
+      'Gnosis Chain',
+      { name: 'xDai', symbol: 'xDAI', decimals: 18 },
+      5,
+      false
+    )
+  },
+  {
+    viemChain: fantom,
+    networkNames: ['fantom', 'ftm'],
+    metadata: createChainMetadata(
+      fantom,
+      'Fantom',
+      { name: 'Fantom', symbol: 'FTM', decimals: 18 },
+      1,
+      false
+    )
+  },
+  {
+    viemChain: filecoin,
+    networkNames: ['filecoin', 'fil'],
+    metadata: createChainMetadata(
+      filecoin,
+      'Filecoin',
+      { name: 'Filecoin', symbol: 'FIL', decimals: 18 },
+      30,
+      false
+    )
+  },
+  {
+    viemChain: moonbeam,
+    networkNames: ['moonbeam'],
+    metadata: createChainMetadata(
+      moonbeam,
+      'Moonbeam',
+      { name: 'Glimmer', symbol: 'GLMR', decimals: 18 },
+      12,
+      false
+    )
+  },
+  {
+    viemChain: moonriver,
+    networkNames: ['moonriver'],
+    metadata: createChainMetadata(
+      moonriver,
+      'Moonriver',
+      { name: 'Moonriver', symbol: 'MOVR', decimals: 18 },
+      12,
+      false
+    )
+  },
+  {
+    viemChain: cronos,
+    networkNames: ['cronos'],
+    metadata: createChainMetadata(
+      cronos,
+      'Cronos',
+      { name: 'Cronos', symbol: 'CRO', decimals: 18 },
+      6,
+      false
+    )
+  },
+  {
+    viemChain: scroll,
+    networkNames: ['scroll'],
+    metadata: createChainMetadata(
+      scroll,
+      'Scroll',
+      { name: 'Ether', symbol: 'ETH', decimals: 18 },
+      2,
+      false
+    )
+  },
+  {
+    viemChain: mantle,
+    networkNames: ['mantle'],
+    metadata: createChainMetadata(
+      mantle,
+      'Mantle',
+      { name: 'Mantle', symbol: 'MNT', decimals: 18 },
+      2,
+      false
+    )
+  },
+  {
+    viemChain: manta,
+    networkNames: ['manta'],
+    metadata: createChainMetadata(
+      manta,
+      'Manta',
+      { name: 'Manta', symbol: 'MANTA', decimals: 18 },
+      2,
+      false
+    )
+  },
+  {
+    viemChain: lumiaMainnet,
+    networkNames: ['lumia'],
+    rpcUrlOverride: 'https://mainnet-rpc.lumia.org',
+    metadata: createChainMetadata(
+      lumiaMainnet,
+      'Lumia',
+      { name: 'Lumia', symbol: 'LUM', decimals: 18 },
+      2,
+      false
+    )
+  },
+  {
+    viemChain: blast,
+    networkNames: ['blast'],
+    metadata: createChainMetadata(
+      blast,
+      'Blast',
+      { name: 'Ether', symbol: 'ETH', decimals: 18 },
+      2,
+      false
+    )
+  },
+  {
+    viemChain: fraxtal,
+    networkNames: ['fraxtal'],
+    metadata: createChainMetadata(
+      fraxtal,
+      'Frax',
+      { name: 'Frax', symbol: 'FRAX', decimals: 18 },
+      2,
+      false
+    )
+  },
+  {
+    viemChain: mode,
+    networkNames: ['mode'],
+    metadata: createChainMetadata(
+      mode,
+      'Mode',
+      { name: 'Ether', symbol: 'ETH', decimals: 18 },
+      2,
+      false
+    )
+  },
+  {
+    viemChain: metis,
+    networkNames: ['metis'],
+    metadata: createChainMetadata(
+      metis,
+      'Metis',
+      { name: 'Metis', symbol: 'METIS', decimals: 18 },
+      2,
+      false
+    )
+  },
+  {
+    viemChain: kroma,
+    networkNames: ['kroma'],
+    metadata: createChainMetadata(
+      kroma,
+      'Kroma',
+      { name: 'Ether', symbol: 'ETH', decimals: 18 },
+      2,
+      false
+    )
+  },
+  {
+    viemChain: zora,
+    networkNames: ['zora'],
+    metadata: createChainMetadata(
+      zora,
+      'Zora',
+      { name: 'Ether', symbol: 'ETH', decimals: 18 },
+      2,
+      false
+    )
+  },
+  {
+    viemChain: aurora,
+    networkNames: ['aurora'],
+    metadata: createChainMetadata(
+      aurora,
+      'Aurora',
+      { name: 'Ether', symbol: 'ETH', decimals: 18 },
+      2,
+      false
+    )
+  },
+  {
+    viemChain: canto,
+    networkNames: ['canto'],
+    metadata: createChainMetadata(
+      canto,
+      'Canto',
+      { name: 'Canto', symbol: 'CANTO', decimals: 18 },
+      2,
+      false
+    )
+  },
+  {
+    viemChain: flowMainnet,
+    networkNames: ['flow'],
+    metadata: createChainMetadata(
+      flowMainnet,
+      'Flow',
+      { name: 'Flow', symbol: 'FLOW', decimals: 18 },
+      2,
+      false
+    )
+  },
 
   // Testnets
-  { viemChain: sepolia, networkNames: ['sepolia'] },
-  { viemChain: optimismSepolia, networkNames: ['optimism-sepolia', 'optimismsepolia'] },
-  { viemChain: arbitrumSepolia, networkNames: ['arbitrum-sepolia', 'arbitrumsepolia'] },
-  { viemChain: baseSepolia, networkNames: ['base-sepolia', 'basesepolia'] },
-  { viemChain: polygonAmoy, networkNames: ['polygon-amoy', 'polygonamoy'] },
-  { viemChain: avalancheFuji, networkNames: ['avalanche-fuji', 'avalanchefuji', 'fuji'] },
-  { viemChain: bscTestnet, networkNames: ['bsc-testnet', 'bsctestnet'] },
-  { viemChain: zksyncSepoliaTestnet, networkNames: ['zksync-sepolia', 'zksyncsepolia'] },
-  { viemChain: lineaSepolia, networkNames: ['linea-sepolia', 'lineasepolia'] },
-  { viemChain: lumiaTestnet, networkNames: ['lumia-testnet'], rpcUrlOverride: 'https://testnet-rpc.lumia.org' }, // Example override
-  { viemChain: scrollSepolia, networkNames: ['scroll-sepolia', 'scrollsepolia'] },
-  { viemChain: mantleSepoliaTestnet, networkNames: ['mantle-sepolia', 'mantlesepolia'] },
-  { viemChain: mantaSepoliaTestnet, networkNames: ['manta-sepolia', 'mantasepolia'] },
-  { viemChain: blastSepolia, networkNames: ['blast-sepolia', 'blastsepolia'] },
-  { viemChain: fraxtalTestnet, networkNames: ['fraxtal-testnet', 'fraxtaltestnet'] },
-  { viemChain: modeTestnet, networkNames: ['mode-testnet', 'modetestnet'] },
-  { viemChain: metisSepolia, networkNames: ['metis-sepolia', 'metissepolia'] },
-  { viemChain: kromaSepolia, networkNames: ['kroma-sepolia', 'kromasepolia'] },
-  { viemChain: zoraSepolia, networkNames: ['zora-sepolia', 'zorasepolia'] },
-  { viemChain: celoAlfajores, networkNames: ['celo-alfajores', 'celoalfajores', 'alfajores'] },
-  { viemChain: goerli, networkNames: ['goerli'] },
-  { viemChain: holesky, networkNames: ['holesky'] },
-  { viemChain: flowTestnet, networkNames: ['flow-testnet'] },
+  {
+    viemChain: sepolia,
+    networkNames: ['sepolia'],
+    metadata: createChainMetadata(
+      sepolia,
+      'Sepolia',
+      { name: 'Ether', symbol: 'ETH', decimals: 18 },
+      12,
+      true
+    )
+  },
+  {
+    viemChain: goerli,
+    networkNames: ['goerli'],
+    metadata: createChainMetadata(
+      goerli,
+      'Goerli',
+      { name: 'Ether', symbol: 'ETH', decimals: 18 },
+      15,
+      true
+    )
+  },
+  {
+    viemChain: optimismGoerli,
+    networkNames: ['optimism-goerli', 'optimismgoerli'],
+    metadata: createChainMetadata(
+      optimismGoerli,
+      'Optimism Goerli',
+      { name: 'Ether', symbol: 'ETH', decimals: 18 },
+      2,
+      true
+    )
+  },
+  {
+    viemChain: arbitrumGoerli,
+    networkNames: ['arbitrum-goerli', 'arbitrumgoerli'],
+    metadata: createChainMetadata(
+      arbitrumGoerli,
+      'Arbitrum Goerli',
+      { name: 'Ether', symbol: 'ETH', decimals: 18 },
+      0.25,
+      true
+    )
+  },
+  {
+    viemChain: baseGoerli,
+    networkNames: ['base-goerli', 'basegoerli'],
+    metadata: createChainMetadata(
+      baseGoerli,
+      'Base Goerli',
+      { name: 'Ether', symbol: 'ETH', decimals: 18 },
+      2,
+      true
+    )
+  },
+  {
+    viemChain: polygonMumbai,
+    networkNames: ['mumbai'],
+    metadata: createChainMetadata(
+      polygonMumbai,
+      'Mumbai',
+      { name: 'Matic', symbol: 'MATIC', decimals: 18 },
+      2,
+      true
+    )
+  },
+  {
+    viemChain: avalancheFuji,
+    networkNames: ['fuji'],
+    metadata: createChainMetadata(
+      avalancheFuji,
+      'Fuji',
+      { name: 'Avalanche', symbol: 'AVAX', decimals: 18 },
+      2,
+      true
+    )
+  },
+  {
+    viemChain: bscTestnet,
+    networkNames: ['bsc-testnet', 'bsctestnet'],
+    metadata: createChainMetadata(
+      bscTestnet,
+      'BSC Testnet',
+      { name: 'BNB', symbol: 'BNB', decimals: 18 },
+      3,
+      true
+    )
+  },
+  {
+    viemChain: zksyncSepoliaTestnet,
+    networkNames: ['zksync-sepolia', 'zksyncsepolia'],
+    metadata: createChainMetadata(
+      zksyncSepoliaTestnet,
+      'zkSync Sepolia',
+      { name: 'Ether', symbol: 'ETH', decimals: 18 },
+      0.1,
+      true
+    )
+  },
+  {
+    viemChain: lineaSepolia,
+    networkNames: ['linea-sepolia', 'lineasepolia'],
+    metadata: createChainMetadata(
+      lineaSepolia,
+      'Linea Sepolia',
+      { name: 'Ether', symbol: 'ETH', decimals: 18 },
+      2,
+      true
+    )
+  },
+  {
+    viemChain: lumiaTestnet,
+    networkNames: ['lumia-testnet'],
+    rpcUrlOverride: 'https://testnet-rpc.lumia.org',
+    metadata: createChainMetadata(
+      lumiaTestnet,
+      'Lumia Testnet',
+      { name: 'Lumia', symbol: 'LUM', decimals: 18 },
+      2,
+      true
+    )
+  },
+  {
+    viemChain: scrollSepolia,
+    networkNames: ['scroll-sepolia', 'scrollsepolia'],
+    metadata: createChainMetadata(
+      scrollSepolia,
+      'Scroll Sepolia',
+      { name: 'Ether', symbol: 'ETH', decimals: 18 },
+      2,
+      true
+    )
+  },
+  {
+    viemChain: mantleSepoliaTestnet,
+    networkNames: ['mantle-sepolia', 'mantlesepolia'],
+    metadata: createChainMetadata(
+      mantleSepoliaTestnet,
+      'Mantle Sepolia',
+      { name: 'Mantle', symbol: 'MNT', decimals: 18 },
+      2,
+      true
+    )
+  },
+  {
+    viemChain: optimismSepolia,
+    networkNames: ['optimism-sepolia', 'optimismsepolia'],
+    metadata: createChainMetadata(
+      optimismSepolia,
+      'Optimism Sepolia',
+      { name: 'Ether', symbol: 'ETH', decimals: 18 },
+      2,
+      true
+    )
+  },
+  {
+    viemChain: arbitrumSepolia,
+    networkNames: ['arbitrum-sepolia', 'arbitrumsepolia'],
+    metadata: createChainMetadata(
+      arbitrumSepolia,
+      'Arbitrum Sepolia',
+      { name: 'Ether', symbol: 'ETH', decimals: 18 },
+      0.25,
+      true
+    )
+  },
+  {
+    viemChain: baseSepolia,
+    networkNames: ['base-sepolia', 'basesepolia'],
+    metadata: createChainMetadata(
+      baseSepolia,
+      'Base Sepolia',
+      { name: 'Ether', symbol: 'ETH', decimals: 18 },
+      2,
+      true
+    )
+  },
+  {
+    viemChain: polygonAmoy,
+    networkNames: ['polygon-amoy', 'polygonamoy'],
+    metadata: createChainMetadata(
+      polygonAmoy,
+      'Polygon Amoy',
+      { name: 'Matic', symbol: 'MATIC', decimals: 18 },
+      2,
+      true
+    )
+  },
+  {
+    viemChain: mantaSepoliaTestnet,
+    networkNames: ['manta-sepolia', 'mantasepolia'],
+    metadata: createChainMetadata(
+      mantaSepoliaTestnet,
+      'Manta Sepolia',
+      { name: 'Manta', symbol: 'MANTA', decimals: 18 },
+      2,
+      true
+    )
+  },
+  {
+    viemChain: blastSepolia,
+    networkNames: ['blast-sepolia', 'blastsepolia'],
+    metadata: createChainMetadata(
+      blastSepolia,
+      'Blast Sepolia',
+      { name: 'Ether', symbol: 'ETH', decimals: 18 },
+      2,
+      true
+    )
+  },
+  {
+    viemChain: fraxtalTestnet,
+    networkNames: ['fraxtal-testnet', 'fraxtaltestnet'],
+    metadata: createChainMetadata(
+      fraxtalTestnet,
+      'Frax Testnet',
+      { name: 'Frax', symbol: 'FRAX', decimals: 18 },
+      2,
+      true
+    )
+  },
+  {
+    viemChain: zoraSepolia,
+    networkNames: ['zora-sepolia', 'zorasepolia'],
+    metadata: createChainMetadata(
+      zoraSepolia,
+      'Zora Sepolia',
+      { name: 'Ether', symbol: 'ETH', decimals: 18 },
+      2,
+      true
+    )
+  },
+  {
+    viemChain: celoAlfajores,
+    networkNames: ['celo-alfajores', 'celoalfajores', 'alfajores'],
+    metadata: createChainMetadata(
+      celoAlfajores,
+      'Celo Alfajores',
+      { name: 'Celo', symbol: 'CELO', decimals: 18 },
+      5,
+      true
+    )
+  },
+  {
+    viemChain: holesky,
+    networkNames: ['holesky'],
+    metadata: createChainMetadata(
+      holesky,
+      'Holesky',
+      { name: 'Ether', symbol: 'ETH', decimals: 18 },
+      12,
+      true
+    )
+  },
+  {
+    viemChain: flowTestnet,
+    networkNames: ['flow-testnet'],
+    metadata: createChainMetadata(
+      flowTestnet,
+      'Flow Testnet',
+      { name: 'Flow', symbol: 'FLOW', decimals: 18 },
+      2,
+      true
+    )
+  },
+  {
+    viemChain: modeTestnet,
+    networkNames: ['mode-testnet', 'modetestnet'],
+    metadata: createChainMetadata(
+      modeTestnet,
+      'Mode Testnet',
+      { name: 'Ether', symbol: 'ETH', decimals: 18 },
+      2,
+      true
+    )
+  },
+  {
+    viemChain: metisSepolia,
+    networkNames: ['metis-sepolia', 'metissepolia'],
+    metadata: createChainMetadata(
+      metisSepolia,
+      'Metis Sepolia',
+      { name: 'Metis', symbol: 'METIS', decimals: 18 },
+      2,
+      true
+    )
+  },
+  {
+    viemChain: kromaSepolia,
+    networkNames: ['kroma-sepolia', 'kromasepolia'],
+    metadata: createChainMetadata(
+      kromaSepolia,
+      'Kroma Sepolia',
+      { name: 'Ether', symbol: 'ETH', decimals: 18 },
+      2,
+      true
+    )
+  }
 ];
-
-// --- Derived Maps (Generated from supportedChains) ---
 
 // Map chain IDs to viem Chain objects
 export const chainMap: Readonly<Record<number, Chain>> = Object.freeze(
@@ -208,16 +836,21 @@ export const networkNameMap: Readonly<Record<string, number>> = Object.freeze(
 export const rpcUrlMap: Readonly<Record<number, string>> = Object.freeze(
   supportedChains.reduce((map, { viemChain, rpcUrlOverride }) => {
     const defaultRpc = viemChain.rpcUrls.default?.http[0];
-    // Prioritize override, then viem default. Fallback handled in getRpcUrl.
     if (rpcUrlOverride) {
       map[viemChain.id] = rpcUrlOverride;
     } else if (defaultRpc) {
       map[viemChain.id] = defaultRpc;
     }
-    // If neither override nor viem default exists, it won't be added here.
-    // getRpcUrl will handle the final fallback to DEFAULT_RPC_URL.
     return map;
   }, {} as Record<number, string>)
+);
+
+// Map chain IDs to their metadata
+export const chainMetadataMap: Readonly<Record<number, ChainMetadata>> = Object.freeze(
+  supportedChains.reduce((map, { viemChain, metadata }) => {
+    map[viemChain.id] = metadata;
+    return map;
+  }, {} as Record<number, ChainMetadata>)
 );
 
 // --- Helper Functions ---
@@ -312,8 +945,51 @@ export function getRpcUrl(chainIdentifier: NetworkIdentifier): RpcUrl {
  * @returns An array of primary network name strings.
  */
 export function getSupportedNetworks(): string[] {
-  // Return the first name (primary) from each definition's networkNames array
   return supportedChains
-    .map(def => def.networkNames[0]) // Get primary name
-    .sort(); // Sort alphabetically
+    .map(def => def.networkNames[0])
+    .sort();
+}
+
+/**
+ * Gets a sorted list of testnet network names.
+ *
+ * @returns An array of testnet network name strings.
+ */
+export function getTestnetNetworks(): string[] {
+  return supportedChains
+    .filter(def => def.metadata.isTestnet)
+    .map(def => def.networkNames[0])
+    .sort();
+}
+
+/**
+ * Gets a sorted list of mainnet network names.
+ *
+ * @returns An array of mainnet network name strings.
+ */
+export function getMainnetNetworks(): string[] {
+  return supportedChains
+    .filter(def => !def.metadata.isTestnet)
+    .map(def => def.networkNames[0])
+    .sort();
+}
+
+/**
+ * Gets chain metadata for a given chain identifier.
+ *
+ * @param chainIdentifier - The chain ID (number) or network name (string).
+ * @returns The chain metadata.
+ * @throws {Error} If the chain identifier is invalid or unsupported.
+ */
+export function getChainMetadata(chainIdentifier: NetworkIdentifier): ChainMetadata {
+  const chainId = resolveChainId(chainIdentifier);
+  const metadata = chainMetadataMap[chainId];
+  if (!metadata) {
+    throw new ChainError(
+      `No metadata found for chain ${chainIdentifier}`,
+      'NO_CHAIN_METADATA',
+      chainIdentifier
+    );
+  }
+  return metadata;
 }

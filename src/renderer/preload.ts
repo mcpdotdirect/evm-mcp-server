@@ -1,4 +1,4 @@
-import { contextBridge, ipcRenderer } from 'electron';
+import { contextBridge, ipcRenderer, IpcRendererEvent } from 'electron';
 
 // Expose protected methods that allow the renderer process to use
 // the ipcRenderer without exposing the entire object
@@ -23,10 +23,10 @@ contextBridge.exposeInMainWorld('electron', {
     send: (channel: string, data: any) => {
       ipcRenderer.send(channel, data);
     },
-    on: (channel: string, func: (...args: any[]) => void) => {
-      ipcRenderer.on(channel, (event, ...args) => func(...args));
+    on: (channel: string, func: (...args: unknown[]) => void) => {
+      ipcRenderer.on(channel, (event: IpcRendererEvent, ...args: unknown[]) => func(...args));
     },
-    removeListener: (channel: string, func: (...args: any[]) => void) => {
+    removeListener: (channel: string, func: (...args: unknown[]) => void) => {
       ipcRenderer.removeListener(channel, func);
     },
   },

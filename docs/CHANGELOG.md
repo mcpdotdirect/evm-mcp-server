@@ -33,4 +33,3 @@
 * npm public release ([df6d52d](https://github.com/mcpdotdirect/evm-mcp-server/commit/df6d52db01e0b290f0da7ea1a087243484ce4e5c))
 
 
-

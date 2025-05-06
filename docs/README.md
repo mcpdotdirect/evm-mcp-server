@@ -519,7 +519,7 @@ A desktop application for the Model Context Protocol (MCP) server, providing a u
 
 1. Clone the repository:
 ```bash
-git clone https://github.com/yourusername/evm-mcp-server.git
+git clone https://github.com/accessor-io/evm-mcp-server.git
 cd evm-mcp-server
 ```
 

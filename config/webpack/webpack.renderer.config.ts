@@ -1,7 +1,7 @@
 import type { Configuration } from 'webpack';
 import path from 'path';
 
-const config: Configuration = {
+export const rendererConfig: Configuration = {
   entry: './src/renderer/renderer.ts',
   target: 'electron-renderer',
   module: {
@@ -26,6 +26,4 @@ const config: Configuration = {
     path: path.resolve(__dirname, 'build/renderer'),
     filename: 'renderer.js',
   },
-};
-
-export default config; 
+}; 

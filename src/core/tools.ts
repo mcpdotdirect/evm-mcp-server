@@ -1,9 +1,53 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { getSupportedNetworks, getRpcUrl } from "./chains.js";
+import { getSupportedNetworks, getRpcUrl, getChain } from "./chains.js";
 import * as services from "./services/index.js";
-import { type Address, type Hex, type Hash } from 'viem';
+import { getWalletClient } from "./services/clients.js";
+import { type Address, type Hex, type Hash, type Abi, type Account, type Chain } from 'viem';
 import { normalize } from 'viem/ens';
+
+interface ToolParams {
+  network?: string;
+  blockNumber?: number;
+  blockHash?: Hash;
+  address?: Address;
+  name?: string;
+  tokenAddress?: Address;
+  tokenId?: string;
+  ownerAddress?: Address;
+  toAddress?: Address;
+  amount?: string;
+  privateKey?: Hex;
+  contractAddress?: Address;
+  abi?: Abi;
+  functionName?: string;
+  args?: readonly unknown[];
+  spenderAddress?: Address;
+  txHash?: Hash;
+  ensName?: string;
+  [key: string]: any;
+}
+
+interface ToolResponse {
+  content: Array<{
+    type: string;
+    text: string;
+  }>;
+  isError?: boolean;
+}
+
+interface ToolHandler {
+  (params: ToolParams): Promise<ToolResponse>;
+}
+
+interface McpServerWithTools extends McpServer {
+  tool: (
+    name: string,
+    description: string,
+    params: Record<string, z.ZodType<any>>,
+    handler: ToolHandler
+  ) => void;
+}
 
 /**
  * Register all EVM-related tools with the MCP server
@@ -13,7 +57,7 @@ import { normalize } from 'viem/ens';
  * 
  * @param server The MCP server instance
  */
-export function registerEVMTools(server: McpServer) {
+export function registerEVMTools(server: McpServerWithTools) {
   // NETWORK INFORMATION TOOLS
   
   // Get chain information
@@ -64,6 +108,10 @@ export function registerEVMTools(server: McpServer) {
     },
     async ({ ensName, network = "ethereum" }) => {
       try {
+        if (!ensName) {
+          throw new Error("ENS name is required");
+        }
+
         // Validate that the input is an ENS name
         if (!ensName.includes('.')) {
           return {
@@ -145,7 +193,11 @@ export function registerEVMTools(server: McpServer) {
     },
     async ({ blockNumber, network = "ethereum" }) => {
       try {
-        const block = await services.getBlockByNumber(blockNumber, network);
+        if (blockNumber === undefined) {
+          throw new Error("Block number is required");
+        }
+
+        const block = await services.getBlockByNumber(BigInt(blockNumber), network);
         
         return {
           content: [{
@@ -206,6 +258,10 @@ export function registerEVMTools(server: McpServer) {
     },
     async ({ address, network = "ethereum" }) => {
       try {
+        if (!address) {
+          throw new Error("Address is required");
+        }
+
         const balance = await services.getETHBalance(address, network);
         
         return {
@@ -435,7 +491,15 @@ export function registerEVMTools(server: McpServer) {
     },
     async ({ privateKey, to, amount, network = "ethereum" }) => {
       try {
-        const txHash = await services.transferETH(privateKey, to, amount, network);
+        if (typeof privateKey !== 'string' || typeof to !== 'string' || typeof amount !== 'string') {
+          throw new Error("Private key, recipient address, and amount are required and must be strings");
+        }
+
+        // Format private key with 0x prefix if needed
+        const formattedKey = privateKey.startsWith('0x') ? privateKey : `0x${privateKey}`;
+        
+        // At this point, we know formattedKey is a string starting with 0x
+        const txHash = await services.transferETH(formattedKey as `0x${string}`, to, amount, network);
         
         return {
           content: [{
@@ -474,16 +538,20 @@ export function registerEVMTools(server: McpServer) {
     },
     async ({ privateKey, tokenAddress, toAddress, amount, network = "ethereum" }) => {
       try {
-        // Get the formattedKey with 0x prefix
-        const formattedKey = privateKey.startsWith('0x') 
-          ? privateKey as `0x${string}` 
-          : `0x${privateKey}` as `0x${string}`;
+        if (typeof privateKey !== 'string' || typeof tokenAddress !== 'string' || 
+            typeof toAddress !== 'string' || typeof amount !== 'string') {
+          throw new Error("Private key, token address, recipient address, and amount are required and must be strings");
+        }
+
+        // Format private key with 0x prefix if needed
+        const formattedKey = privateKey.startsWith('0x') ? privateKey : `0x${privateKey}`;
         
+        // At this point, we know formattedKey is a string starting with 0x
         const result = await services.transferERC20(
-          tokenAddress as Address, 
-          toAddress as Address, 
+          tokenAddress,
+          toAddress,
           amount,
-          formattedKey,
+          formattedKey as `0x${string}`,
           network
         );
         
@@ -526,16 +594,20 @@ export function registerEVMTools(server: McpServer) {
     },
     async ({ privateKey, tokenAddress, spenderAddress, amount, network = "ethereum" }) => {
       try {
-        // Get the formattedKey with 0x prefix
-        const formattedKey = privateKey.startsWith('0x') 
-          ? privateKey as `0x${string}` 
-          : `0x${privateKey}` as `0x${string}`;
+        if (typeof privateKey !== 'string' || typeof tokenAddress !== 'string' || 
+            typeof spenderAddress !== 'string' || typeof amount !== 'string') {
+          throw new Error("Private key, token address, spender address, and amount are required and must be strings");
+        }
+
+        // Format private key with 0x prefix if needed
+        const formattedKey = privateKey.startsWith('0x') ? privateKey : `0x${privateKey}`;
         
+        // At this point, we know formattedKey is a string starting with 0x
         const result = await services.approveERC20(
-          tokenAddress as Address, 
-          spenderAddress as Address, 
+          tokenAddress,
+          spenderAddress,
           amount,
-          formattedKey,
+          formattedKey as `0x${string}`,
           network
         );
         
@@ -764,43 +836,55 @@ export function registerEVMTools(server: McpServer) {
     }
   );
 
-  // Write to contract
+  // Write to smart contract
   server.tool(
     "write_contract",
-    "Write data to a smart contract by calling a state-changing function. This modifies blockchain state and requires gas payment and transaction signing.",
+    "Write to a smart contract",
     {
-      contractAddress: z.string().describe("The address of the smart contract to interact with"),
-      abi: z.array(z.any()).describe("The ABI (Application Binary Interface) of the smart contract function, as a JSON array"),
-      functionName: z.string().describe("The name of the function to call on the contract (e.g., 'transfer')"),
-      args: z.array(z.any()).describe("The arguments to pass to the function, as an array (e.g., ['0x1234...', '1000000000000000000'])"),
-      privateKey: z.string().describe("Private key of the sending account in hex format (with or without 0x prefix). SECURITY: This is used only for transaction signing and is not stored."),
-      network: z.string().optional().describe("Network name (e.g., 'ethereum', 'optimism', 'arbitrum', 'base', 'polygon') or chain ID. Defaults to Ethereum mainnet.")
+      contractAddress: z.string().describe("The contract address or ENS name to write to"),
+      abi: z.any().describe("The contract ABI"),
+      functionName: z.string().describe("The function to call"),
+      args: z.array(z.any()).optional().describe("The function arguments"),
+      privateKey: z.string().describe("The private key to sign the transaction with"),
+      network: z.string().optional().describe("Network name or chain ID. Defaults to Ethereum mainnet.")
     },
-    async ({ contractAddress, abi, functionName, args, privateKey, network = "ethereum" }) => {
+    async ({ contractAddress, abi, functionName, args = [], privateKey, network = "ethereum" }) => {
       try {
-        // Parse ABI if it's a string
-        const parsedAbi = typeof abi === 'string' ? JSON.parse(abi) : abi;
-        
-        const contractParams: Record<string, any> = {
+        if (!privateKey) {
+          throw new Error("Private key is required");
+        }
+
+        // Get the chain configuration for the network
+        const chain = getChain(network);
+        if (!chain) {
+          throw new Error(`Unsupported network: ${network}`);
+        }
+
+        // Create wallet client from private key
+        const walletClient = getWalletClient(privateKey as Hex, chain);
+        if (!walletClient) {
+          throw new Error("Failed to create wallet client");
+        }
+
+        const result = await services.writeContract({
           address: contractAddress as Address,
-          abi: parsedAbi,
+          abi: abi as Abi,
           functionName,
-          args
-        };
-        
-        const txHash = await services.writeContract(
-          privateKey as Hex, 
-          contractParams, 
-          network
-        );
+          args: args as readonly unknown[],
+          account: walletClient.account,
+          chain,
+          value: BigInt(0)
+        });
         
         return {
           content: [{
             type: "text",
             text: JSON.stringify({
+              contractAddress,
+              functionName,
+              args,
               network,
-              transactionHash: txHash,
-              message: "Contract write transaction sent successfully"
+              result
             }, null, 2)
           }]
         };

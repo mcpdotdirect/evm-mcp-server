@@ -1,0 +1,106 @@
+### Completed Milestones / Key Features Implemented
+
+*  
+*   **ENS (Ethereum Name Service):**
+    *   Added initial ENS support, including basic setup and likely resolution capabilities (details in `src/core/services/ens.ts`).
+*   **Wallet/Account:**
+    *   Basic private key handling via environment variables.
+*   **Packaging & Deployment:**
+    *   Configured for NPM public release.
+    *   Set up GitHub Actions for CI/CD (implied by secret fixes).
+*   **UI (Electron):**
+    *   Developed a basic Electron frontend (`src/renderer/`) for configuration management and interaction.
+    *   Implemented IPC communication between renderer and main processes (`src/renderer/preload.ts`).
+*   **Development & Maintenance:**
+    *   Established CHANGELOG and versioning.
+    *   Addressed initial bugs related to tool naming and configuration.
+
+### To Do / Future Enhancements (Roadmap)
+
+*   **Core Functionality & Transaction Tools:**
+    *   **Contract Interaction:**
+        *   Implement generic `callContractFunction` tool (read-only).
+        *   Implement generic `writeContractFunction` tool (state-changing).
+        *   Add specific tools for common token standards:
+            *   ERC20: `transfer`, `approve`, `allowance`, `balanceOf`, `totalSupply`.
+            *   ERC721: `transferFrom`, `safeTransferFrom`, `approve`, `setApprovalForAll`, `ownerOf`, `tokenURI`, `balanceOf`.
+            *   ERC1155: `safeTransferFrom`, `safeBatchTransferFrom`, `setApprovalForAll`, `balanceOf`, `balanceOfBatch`.
+    *   **Transaction Lifecycle:**
+        *   Improve gas estimation: Offer strategies (e.g., `fast`, `standard`, `slow` based on oracles), allow manual overrides (gas price, max fee per gas, max priority fee per gas).
+        *   Add support for transaction simulation/dry-runs using tools like Tenderly or forking mainnet.
+        *   Implement robust nonce management (track pending transactions).
+        *   Add transaction monitoring tool (`getTransactionReceipt`, `waitForTransactionReceipt`).
+        *   Implement batch transaction processing (e.g., using multicall contracts).
+    *   **State Reading:**
+        *   Enhance `getBalance` (support block tags).
+        *   Add `getTokenBalance` (ERC20/ERC721/ERC1155).
+        *   Add `getStorageAt` tool.
+        *   Add `getCode` tool.
+*   **Chain Support:**
+    *   Continuously add support for new EVM chains (Mainnets & Testnets) based on demand (e.g., Base Sepolia, Polygon Amoy, Arbitrum Sepolia). Update `src/core/chains.ts`.
+    *   Develop a clear process/checklist for adding and verifying new chain support.
+    *   Explore feasibility and potential architecture changes for supporting non-EVM chains (e.g., Solana, Cosmos SDK chains, Bitcoin) if the project scope expands significantly.
+*   **ENS (Ethereum Name Service):**
+    *   Enhance resolution: `getAddress` (with coin type support), `getText` record, `getContentHash`.
+    *   Implement reverse resolution (`getName`).
+    *   Add tools for managing ENS records: `setText`, `setAddr`, `setContenthash`.
+    *   Add tools for managing subdomains (`setSubnodeOwner`, `setSubnodeRecord`).
+    *   Support ENS registration/renewal interactions.
+    *   Investigate support for ENS avatars (`setAvatar`).
+    *   Explore CCIP-Read support for off-chain data resolution.
+*   **Wallet/Account Management:**
+    *   **Wallet Types:**
+        *   Integrate hardware wallet support (Ledger, Trezor) via WebHID/WebUSB (requires careful security considerations, likely in a dedicated UI context).
+        *   Explore support for Smart Contract Wallets (ERC-4337): Handling UserOperations, interacting with Bundlers and Paymasters.
+    *   **Key Management:**
+        *   Implement more secure private key management options beyond environment variables (e.g., integration with KMS, HashiCorp Vault, encrypted keystore files).
+        *   Add support for HD Wallets (BIP-32/BIP-44) for deriving multiple addresses from a single mnemonic phrase.
+        *   Consider integration with browser extensions like MetaMask for transaction signing (if running in a browser-like context or via deep linking).
+*   **Tooling & Developer Experience:**
+    *   **Testing:**
+        *   Develop a comprehensive testing suite: Unit tests (Vitest/Jest), Integration tests (against local node like Anvil/Hardhat or testnets), End-to-end tests.
+        *   Aim for high test coverage.
+        *   Implement fuzz testing for critical components like transaction signing and ABI encoding.
+    *   **Error Handling:** Improve error handling with standardized error codes, more informative messages, and context propagation.
+    *   **Logging:** Enhance logging capabilities: Structured logging (JSON), configurable log levels, potential integration with external logging services (e.g., Sentry, Datadog).
+    *   **Documentation:**
+        *   Add detailed documentation for all tools, APIs, and configuration options.
+        *   Generate API reference documentation (e.g., using TypeDoc).
+        *   Create tutorials and usage examples.
+        *   Maintain an up-to-date `CHANGELOG.md`.
+    *   **API/CLI:** Refine the server API (e.g., OpenAPI/Swagger specification) or command-line interface for clarity, consistency, and ease of use. Consider generating client SDKs.
+*   **UI/UX (If Applicable - `src/renderer`):**
+    *   Refine the example UI for better usability: Clearer display of analysis results, improved configuration management, real-time log viewer.
+    *   Add components for transaction history, network status indication, and wallet connection management.
+    *   Ensure accessibility (WCAG compliance).
+*   **Security:**
+    *   Conduct regular security audits (internal reviews, potentially external audits later).
+    *   Implement security best practices: Input validation/sanitization, dependency scanning (e.g., `npm audit`, Snyk), rate limiting (if exposed as a public service), protection against replay attacks, secure handling of private keys and sensitive data.
+    *   Formal verification for highly critical components might be considered in the long term.
+*   **Integrations:**
+    *   Integrate with external blockchain data providers (e.g., Etherscan/Blockscout APIs, The Graph subgraphs, Dune Analytics API) for richer data retrieval.
+    *   Integrate with blockchain analysis tools (e.g., Chainalysis API, Elliptic API) for risk scoring or transaction monitoring.
+    *   Integrate with DeFi protocol APIs/SDKs (e.g., Uniswap SDK, Aave) for simplified interaction tools.
+    *   Integrate with oracle services (e.g., Chainlink data feeds) for accessing off-chain data.
+*   **Performance & Scalability:**
+    *   Implement caching strategies for frequently accessed data (e.g., RPC responses, ENS lookups, contract ABIs).
+    *   Optimize RPC call usage (batching requests where possible).
+    *   Analyze and optimize performance bottlenecks.
+    *   Consider architectural changes for scalability if usage grows significantly (e.g., horizontal scaling of server instances).
+*   **Community & Governance:**
+    *   Establish clear contribution guidelines (`CONTRIBUTING.md`).
+    *   Set up issue and pull request templates.
+    *   Consider establishing community channels (e.g., Discord, Matrix).
+
+
+Future Plans (Concise Summary - <750 chars)
+
+Core: Enhance EVM interactions (events, state, multicall), add chains, improve ABI handling.
+ENS: Full record/subdomain management, avatars, CCIP-Read.
+Wallet: Hardware/Smart wallet support, secure key/HD wallet management.
+DevEx: Comprehensive testing (unit, integration, fuzz), better error handling/logging, detailed docs/API spec.
+UI: Improve usability, add tx history, network status, wallet management, accessibility.
+Security: Audits, best practices (validation, scanning), secure key handling.
+Integrations: Data providers (Etherscan, Graph), analysis tools, DeFi SDKs, oracles.
+Performance: Caching, RPC optimization, scaling.
+Community: Contribution guidelines & process.
