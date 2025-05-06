@@ -10,8 +10,18 @@
     "sourceMap": true,
     "declaration": true,
     "resolveJsonModule": true,
-    "typeRoots": ["./node_modules/@types", "./src/types"]
+    "typeRoots": ["./node_modules/@types", "./src/types"],
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["src/*"],
+      "@config/*": ["config/*"]
+    },
+    "allowJs": true,
+    "checkJs": true
   },
-  "include": ["src/**/*"],
+  "include": [
+    "src/**/*",
+    "config/**/*"
+  ],
   "exclude": ["node_modules", "dist"]
 }
