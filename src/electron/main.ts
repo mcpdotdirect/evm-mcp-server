@@ -1,6 +1,6 @@
 import { app, BrowserWindow, ipcMain } from 'electron';
 import path from 'path';
-import { MCPConfigManager } from '../core/config/mcp-config.js';
+import { MCPConfigManager } from '../config/core/mcp-config.js';
 import { AutoRecognitionService } from '../core/services/auto-recognition.js';
 import { logger } from '../core/utils/logger.js';
 

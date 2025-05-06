@@ -1,4 +1,4 @@
-import { MCPConfigManager } from '../config/mcp-config.js';
+import { MCPConfigManager } from '../../config/core/mcp-config.js';
 import { logger } from '../utils/logger.js';
 
 interface Pattern {
