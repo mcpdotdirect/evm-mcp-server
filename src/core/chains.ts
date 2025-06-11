@@ -282,6 +282,79 @@ export const rpcUrlMap: Record<number, string> = {
   314159: 'https://api.calibration.node.glif.io/rpc/v1',
 };
 
+export const scanApiKeyMap: Record<number, string | null> = {
+  // Mainnets
+  1: process.env.ETHERSCAN_API_KEY || null,
+  11155111: process.env.ETHERSCAN_API_KEY || null,
+  8453: process.env.BASESCAN_API_KEY || null,
+  84532: process.env.BASESCAN_API_KEY || null,
+  42161: process.env.ARBISCAN_API_KEY || null,
+  42170: process.env.ARBISCAN_API_KEY || null,
+};
+
+// Map chain IDs to endpoint URLs
+export const endpointMap: Record<number, string> = {
+  // Mainnets
+  1: 'https://api.etherscan.io/api', // Ethereum Mainnet
+  10: 'https://api-optimistic.etherscan.io/api', // Optimism Mainnet
+  42161: 'https://api.arbiscan.io/api', // Arbitrum One
+  42170: 'https://api-nova.arbiscan.io/api', // Arbitrum Nova
+  8453: 'https://api.basescan.org/api', // Base Mainnet
+  137: 'https://api.polygonscan.com/api', // Polygon Mainnet
+  1101: 'https://api-zkevm.polygonscan.com/api', // Polygon zkEVM
+  // Los siguientes endpoints no están disponibles públicamente o no tienen un explorador con API conocida:
+  43114: '', // Avalanche C-Chain
+  56: '', // BNB Smart Chain
+  324: '', // zkSync Era
+  59144: '', // Linea Mainnet
+  42220: '', // Celo Mainnet
+  100: '', // Gnosis Chain
+  250: '', // Fantom Opera
+  314: '', // Filecoin Mainnet
+  1284: '', // Moonbeam
+  1285: '', // Moonriver
+  25: '', // Cronos Mainnet
+  534352: '', // Scroll Mainnet
+  5000: '', // Mantle Mainnet
+  169: '', // Manta Pacific Mainnet
+  81457: '', // Blast Mainnet
+  252: '', // Fraxtal Mainnet
+  994873017: '', // Redstone Mainnet
+  34443: '', // Mode Mainnet
+  1088: '', // Metis Mainnet
+  255: '', // Kroma Mainnet
+  7777777: '', // Zora Mainnet
+  1313161554: '', // Aurora Mainnet
+  7700: '', // Canto Mainnet
+  747: '', // ShimmerEVM Mainnet
+
+  // Testnets
+  11155111: 'https://api-sepolia.etherscan.io/api', // Ethereum Sepolia
+  11155420: 'https://api-sepolia-optimistic.etherscan.io/api', // Optimism Sepolia
+  421614: 'https://api-sepolia.arbiscan.io/api', // Arbitrum Sepolia
+  84532: 'https://api-sepolia.basescan.org/api', // Base Sepolia
+  80002: 'https://api-testnet.polygonscan.com/api', // Polygon Mumbai
+  43113: '', // Avalanche Fuji Testnet
+  97: '', // BNB Smart Chain Testnet
+  300: '', // zkSync Testnet
+  59141: '', // Linea Testnet
+  534351: '', // Scroll Sepolia Testnet
+  5003: '', // Mantle Testnet
+  3441006: '', // Mode Testnet
+  1952959480: '', // Redstone Testnet
+  168587773: '', // Blast Sepolia Testnet
+  2522: '', // Fraxtal Sepolia Testnet
+  919: '', // Manta Pacific Testnet
+  59902: '', // Zora Sepolia Testnet
+  2358: '', // Kroma Sepolia Testnet
+  999999999: '', // Zora Testnet
+  44787: '', // Celo Alfajores Testnet
+  5: 'https://api-goerli.etherscan.io/api', // Ethereum Goerli (obsoleto)
+  17000: 'https://api-holesky.etherscan.io/api', // Ethereum Holesky
+  545: '', // ShimmerEVM Testnet
+  314159: '', // Filecoin Calibration Testnet
+};
+
 /**
  * Resolves a chain identifier (number or string) to a chain ID
  * @param chainIdentifier Chain ID (number) or network name (string)

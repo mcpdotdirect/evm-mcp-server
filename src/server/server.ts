@@ -1,6 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { registerEVMResources } from "../core/resources.js";
-import { registerEVMTools } from "../core/tools.js";
+import { registerStaticTools } from "../core/static_tools.js";
+import { registerDynamicTools } from "../core/dynamic_tools.js";
 import { registerEVMPrompts } from "../core/prompts.js";
 import { getSupportedNetworks } from "../core/chains.js";
 
@@ -15,7 +16,8 @@ async function startServer() {
 
     // Register all resources, tools, and prompts
     registerEVMResources(server);
-    registerEVMTools(server);
+    registerStaticTools(server);
+    await registerDynamicTools(server);
     registerEVMPrompts(server);
     
     // Log server information
