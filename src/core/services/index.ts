@@ -7,6 +7,7 @@ export * from './transactions.js';
 export * from './contracts.js';
 export * from './tokens.js';
 export * from './ens.js';
+export * as zilliqa from './zilliqa.js';
 export { utils as helpers } from './utils.js';
 
 // Re-export common types for convenience

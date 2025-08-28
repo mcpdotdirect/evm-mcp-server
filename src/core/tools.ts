@@ -1193,4 +1193,77 @@ export function registerEVMTools(server: McpServer) {
       }
     }
   );
+
+  // ZILLIQA TOOLS
+  
+  // Convert Zilliqa address between bech32 (zil1...) and hex (0x...) formats
+  server.tool(
+    "convert_zilliqa_address",
+    "Convert a Zilliqa address between bech32 (zil1...) and hex (0x...) formats. Only valid for Zilliqa networks.",
+    {
+      address: z.string().describe("The Zilliqa address to convert (either 'zil1...' or '0x...')"),
+      direction: z.enum(["bech32-to-hex", "hex-to-bech32"]).optional().describe("Direction of conversion. If omitted, inferred from the input."),
+      network: z.string().optional().describe("Network must be 'zilliqa' or 'zilliqa-testnet'. Defaults to 'zilliqa'.")
+    },
+    async ({ address, direction, network = "zilliqa" }) => {
+      try {
+        const chainId = await services.getChainId(network);
+        const isZilliqaNetwork = chainId === 32769 || chainId === 33101;
+        if (!isZilliqaNetwork) {
+          return {
+            content: [{
+              type: "text",
+              text: `Error: Network '${network}' (chainId ${chainId}) is not a Zilliqa network. Use 'zilliqa' or 'zilliqa-testnet'.`
+            }],
+            isError: true
+          };
+        }
+
+        let inferredDirection: "bech32-to-hex" | "hex-to-bech32" | undefined = direction;
+        if (!inferredDirection) {
+          if (address.startsWith("zil1")) inferredDirection = "bech32-to-hex";
+          else if (address.startsWith("0x") || /^[0-9a-fA-F]{40}$/.test(address)) inferredDirection = "hex-to-bech32";
+        }
+
+        if (!inferredDirection) {
+          return {
+            content: [{
+              type: "text",
+              text: `Error: Unable to infer direction. Provide a 'zil1...' bech32 or a '0x...' hex address, or set the 'direction' explicitly.`
+            }],
+            isError: true
+          };
+        }
+
+        let output: string;
+        if (inferredDirection === "bech32-to-hex") {
+          output = services.zilliqa.zilToHex(address);
+        } else {
+          const hexInput = address.startsWith("0x") ? address : `0x${address}`;
+          output = services.zilliqa.hexToZil(hexInput);
+        }
+
+        return {
+          content: [{
+            type: "text",
+            text: JSON.stringify({
+              network,
+              chainId,
+              input: address,
+              output,
+              direction: inferredDirection
+            }, null, 2)
+          }]
+        };
+      } catch (error) {
+        return {
+          content: [{
+            type: "text",
+            text: `Error converting Zilliqa address: ${error instanceof Error ? error.message : String(error)}`
+          }],
+          isError: true
+        };
+      }
+    }
+  );
 } 
