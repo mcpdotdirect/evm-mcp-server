@@ -4,6 +4,7 @@ import startServer from "./server.js";
 import express, { Request, Response } from "express";
 import cors from "cors";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { getPublicClient } from "../core/services/clients.js";
 
 // Environment variables - hardcoded values
 const PORT = 3001;
@@ -124,7 +125,7 @@ app.post("/messages", (req: Request, res: Response) => {
   
   if (!sessionId) {
     console.error("No session ID provided and multiple connections exist");
-    return res.status(400).json({ 
+    return res.status(400).json({
       error: "No session ID provided. Please provide a sessionId query parameter or connect to /sse first.",
       activeConnections: connections.size
     });
@@ -148,9 +149,56 @@ app.post("/messages", (req: Request, res: Response) => {
   }
 });
 
+// Add a generic streaming HTTP endpoint
+// @ts-ignore
+app.get("/stream", (req: Request, res: Response) => {
+  const network = req.query.network?.toString() || 'ethereum';
+  console.error(`Received request for block stream on network: ${network}`);
+
+  // Set headers for streaming NDJSON
+  res.setHeader('Content-Type', 'application/x-ndjson');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.setHeader('Access-Control-Allow-Origin', '*'); // CORS
+  res.flushHeaders(); // Send headers immediately
+
+  try {
+    const client = getPublicClient(network);
+
+    const unwatch = client.watchBlocks({
+      emitOnBegin: true,
+      onBlock: (block) => {
+        // Serialize the block object (which can contain BigInts)
+        const blockAsString = JSON.stringify(block, (key, value) =>
+          typeof value === 'bigint' ? value.toString() : value
+        );
+        // Write the block data as a newline-delimited JSON string
+        res.write(blockAsString + '\n');
+      },
+      onError: (error) => {
+        console.error(`Error watching blocks on ${network}:`, error);
+        res.write(JSON.stringify({ error: 'An error occurred while watching blocks.' }) + '\n');
+        res.end();
+      }
+    });
+
+    // Handle client closing connection
+    req.on('close', () => {
+      console.error(`Client closed the block stream for ${network}.`);
+      unwatch();
+      res.end();
+    });
+
+  } catch (error) {
+    console.error(`Failed to start block stream for ${network}:`, error);
+    res.status(500).json({ error: `Failed to initialize block stream: ${error.message}` });
+  }
+});
+
+
 // Add a simple health check endpoint
 app.get("/health", (req: Request, res: Response) => {
-  res.status(200).json({ 
+  res.status(200).json({
     status: "ok",
     server: server ? "initialized" : "initializing",
     activeConnections: connections.size,
@@ -165,6 +213,7 @@ app.get("/", (req: Request, res: Response) => {
     version: "1.0.0",
     endpoints: {
       sse: "/sse",
+      stream: "/stream",
       messages: "/messages",
       health: "/health"
     },
@@ -195,6 +244,7 @@ process.on('SIGINT', () => {
 const httpServer = app.listen(PORT, HOST, () => {
   console.error(`Template MCP Server running at http://${HOST}:${PORT}`);
   console.error(`SSE endpoint: http://${HOST}:${PORT}/sse`);
+  console.error(`Stream endpoint: http://${HOST}:${PORT}/stream`);
   console.error(`Messages endpoint: http://${HOST}:${PORT}/messages (sessionId optional if only one connection)`);
   console.error(`Health check: http://${HOST}:${PORT}/health`);
 }).on('error', (err: Error) => {
