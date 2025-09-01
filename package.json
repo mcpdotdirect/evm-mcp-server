@@ -39,7 +39,7 @@
     "typescript": "^5.8.2"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.7.0",
+    "@modelcontextprotocol/sdk": "^1.17.4",
     "@zilliqa-js/crypto": "^3.5.0",
     "cors": "^2.8.5",
     "express": "^4.21.2",

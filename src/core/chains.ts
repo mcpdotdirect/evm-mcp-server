@@ -289,7 +289,7 @@ export const rpcUrlMap: Record<number, string> = {
   17000: 'https://ethereum-holesky.publicnode.com',
   545: 'https://testnet.evm.nodes.onflow.org',
   314159: 'https://api.calibration.node.glif.io/rpc/v1',
-  33101: 'https://dev-api.zilliqa.com',
+  33101: 'https://api.testnet.zilliqa.com',
 };
 
 /**
