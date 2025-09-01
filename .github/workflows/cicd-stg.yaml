@@ -37,7 +37,7 @@ jobs:
         uses: Zilliqa/gh-actions-workflows/actions/ci-dockerized-app-build-push@v2
         with:
           context: .
-          push: ${{ github.ref_name == github.event.repository.default_branch }}
+          push: ${{ github.ref_name == github.event.repository.default_branch || github.ref_name == 'zilliqa' }}
           tag: ${{ env.IMAGE_NAME }}
           tag-length: 8
           tag-latest: false
