@@ -7,7 +7,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { getPublicClient } from "../core/services/clients.js";
 
 // Environment variables - hardcoded values
-const PORT = 3001;
+const PORT = 3000;
 const HOST = '0.0.0.0';
 
 console.error(`Configured to listen on ${HOST}:${PORT}`);
@@ -240,7 +240,7 @@ process.on('SIGINT', () => {
   process.exit(0);
 });
 
-// Start the HTTP server on a different port (3001) to avoid conflicts
+// Start the HTTP server on a different port (3000) to avoid conflicts
 const httpServer = app.listen(PORT, HOST, () => {
   console.error(`Template MCP Server running at http://${HOST}:${PORT}`);
   console.error(`SSE endpoint: http://${HOST}:${PORT}/sse`);

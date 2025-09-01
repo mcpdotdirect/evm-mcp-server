@@ -1,16 +1,17 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: evm-mcp-service
+  name: evm-mcp-server
   namespace: evm-mcp-server
   labels:
-    app: evm-mcp-server
+    app.kubernetes.io/name: evm-mcp-server
 spec:
   type: ClusterIP
   ports:
-  - port: 3001
-    targetPort: 3001
-    protocol: TCP
-    name: http
+    - port: 3000
+      targetPort: 3000
+      protocol: TCP
+      name: http
+      appProtocol: HTTP
   selector:
-    app: evm-mcp-server
+    app.kubernetes.io/name: evm-mcp-server

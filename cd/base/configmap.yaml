@@ -1,9 +1,11 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: evm-mcp-config
+  name: evm-mcp-server
   namespace: evm-mcp-server
+  labels:
+    app.kubernetes.io/name: evm-mcp-server
 data:
   NODE_ENV: "production"
-  PORT: "3001"
+  PORT: "3000"
   HOST: "0.0.0.0"

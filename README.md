@@ -166,7 +166,7 @@ npm install
 The server uses the following default configuration:
 
 - **Default Chain ID**: 1 (Ethereum Mainnet)
-- **Server Port**: 3001
+- **Server Port**: 3000
 - **Server Host**: 0.0.0.0 (accessible from any network interface)
 
 These values are hardcoded in the application. If you need to modify them, you can edit the following files:
@@ -271,7 +271,7 @@ If you're developing a web application and want to connect to the HTTP server wi
 {
   "mcpServers": {
     "evm-mcp-sse": {
-      "url": "http://localhost:3001/sse"
+      "url": "http://localhost:3000/sse"
     }
   }
 }

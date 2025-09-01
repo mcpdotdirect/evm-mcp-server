@@ -1,0 +1,18 @@
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: evm-mcp-server
+  namespace: evm-mcp-server
+  labels:
+    app.kubernetes.io/name: evm-mcp-server
+spec:
+  parentRefs:
+    - name: mcp-gateway
+      namespace: mcp-gateway-stg
+      sectionName: https
+  hostnames:
+    - "evm.mcp.zilliqa.com"
+  rules:
+    - backendRefs:
+        - name: evm-mcp-server
+          port: 3000

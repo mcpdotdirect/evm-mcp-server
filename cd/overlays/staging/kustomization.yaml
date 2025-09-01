@@ -4,7 +4,7 @@ kind: Kustomization
 resources:
   - ../../base
 
-namespace: evm-mcp-server-prd
+namespace: evm-mcp-server-stg
 
 patches:
   - target:
@@ -13,10 +13,10 @@ patches:
     patch: |-
       - op: replace
         path: "/spec/hostnames/0"
-        value: evm.mcp.zilliqa.com
+        value: evm.mcp.zilstg.dev
       - op: replace
         path: "/spec/parentRefs/0/name"
         value: mcp-gateway
       - op: replace
         path: "/spec/parentRefs/0/namespace"
-        value: mcp-gateway-prd
+        value: mcp-gateway-stg

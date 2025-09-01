@@ -1,0 +1,23 @@
+apiVersion: networking.gke.io/v1
+kind: HealthCheckPolicy
+metadata:
+  name: evm-mcp-server
+  namespace: evm-mcp-server
+  labels:
+    app.kubernetes.io/name: evm-mcp-server
+spec:
+  default:
+    checkIntervalSec: 10
+    timeoutSec: 5
+    healthyThreshold: 1
+    unhealthyThreshold: 3
+    config:
+      type: HTTP
+      httpHealthCheck:
+        portSpecification: USE_FIXED_PORT
+        requestPath: /health
+        port: 3000
+  targetRef:
+    group: ""
+    kind: Service
+    name: evm-mcp-server
