@@ -16,7 +16,7 @@ const clientCache = new Map<string, PublicClient>();
 /**
  * Get a public client for a specific network
  */
-export function getPublicClient(network = 'ethereum'): PublicClient {
+export function getPublicClient(network: number | string = 'ethereum'): PublicClient {
   const cacheKey = String(network);
   
   // Return cached client if available
