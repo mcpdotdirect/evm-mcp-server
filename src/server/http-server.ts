@@ -62,8 +62,8 @@ app.get('/streamable', (req: Request, res: Response) => {
     'Access-Control-Allow-Headers': 'Content-Type, Authorization',
   });
   
-  // Send initial connection message
-  res.write('data: {"type":"connection","status":"connected"}\n\n');
+  // Keep connection alive without sending initial message
+  // Gemini will handle the connection establishment through POST requests
   
   // Handle client disconnect
   req.on('close', () => {
