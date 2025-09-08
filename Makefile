@@ -101,7 +101,7 @@ start: ## Complete workflow: build and run
 	$(MAKE) run-detached
 	@echo "Container started on http://localhost:$(PORT) (HTTP/1.1 with HTTP/2 upgrade support)"
 	@echo "Health check: http://localhost:$(PORT)/health"
-	@echo "StreamableHTTP endpoint: http://localhost:$(PORT)/streamable"
+	@echo "StreamableHTTP endpoint: http://localhost:$(PORT)/mcp"
 
 .PHONY: restart
 restart: ## Restart the container

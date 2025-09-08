@@ -43,17 +43,17 @@ app.get("/health", (req: Request, res: Response) => {
   });
 });
 
-// SSE endpoint for StreamableHTTP connection
+// Endpoint for StreamableHTTP connection
 // @ts-ignore
-app.get('/streamable', (req: Request, res: Response) => {
-  console.error(`Received SSE connection request from ${req.ip}`);
+app.get('/mcp', (req: Request, res: Response) => {
+  console.error(`Received connection request from ${req.ip}`);
   
   if (!server) {
     console.error("Server not initialized yet");
     return res.status(503).json({ error: "Server not initialized" });
   }
   
-  // Set SSE headers
+  // Set headers
   res.writeHead(200, {
     'Content-Type': 'text/event-stream',
     'Cache-Control': 'no-cache',
@@ -67,13 +67,13 @@ app.get('/streamable', (req: Request, res: Response) => {
   
   // Handle client disconnect
   req.on('close', () => {
-    console.error('SSE connection closed');
+    console.error('Connection closed');
   });
 });
 
 // Main MCP endpoint - stateless mode
 // @ts-ignore
-app.post('/streamable', async (req: Request, res: Response) => {
+app.post('/mcp', async (req: Request, res: Response) => {
   console.error(`Received MCP request from ${req.ip}`);
   
   if (!server) {
@@ -123,7 +123,7 @@ const httpServer = app.listen(PORT, HOST, (error) => {
     process.exit(1);
   }
   console.error(`EVM MCP Server listening on port ${PORT}`);
-  console.error(`Endpoint: http://${HOST}:${PORT}/streamable`);
+  console.error(`Endpoint: http://${HOST}:${PORT}/mcp`);
   console.error(`Health: http://${HOST}:${PORT}/health`);
 });
 
