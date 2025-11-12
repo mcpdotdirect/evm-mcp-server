@@ -1170,9 +1170,9 @@ export function registerEVMTools(server: McpServer) {
       try {
         // Ensure the private key has 0x prefix
         const formattedKey = privateKey.startsWith('0x') ? privateKey as Hex : `0x${privateKey}` as Hex;
-        
+
         const address = services.getAddressFromPrivateKey(formattedKey);
-        
+
         return {
           content: [{
             type: "text",
@@ -1187,6 +1187,235 @@ export function registerEVMTools(server: McpServer) {
           content: [{
             type: "text",
             text: `Error deriving address from private key: ${error instanceof Error ? error.message : String(error)}`
+          }],
+          isError: true
+        };
+      }
+    }
+  );
+
+  // ADVANCED TOOLS
+
+  // Get ERC20 allowance
+  server.tool(
+    "get_token_allowance",
+    "Check how much of an ERC20 token a spender is approved to spend on behalf of an owner. This is useful for checking approvals before DeFi operations.",
+    {
+      tokenAddress: z.string().describe("The contract address or ENS name of the ERC20 token (e.g., '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48' for USDC)"),
+      ownerAddress: z.string().describe("The wallet address or ENS name of the token owner (e.g., '0x1234...' or 'vitalik.eth')"),
+      spenderAddress: z.string().describe("The contract address or ENS name that is approved to spend tokens (e.g., a DEX contract address)"),
+      network: z.string().optional().describe("Network name (e.g., 'ethereum', 'optimism', 'arbitrum', 'base', etc.) or chain ID. Defaults to Ethereum mainnet.")
+    },
+    async ({ tokenAddress, ownerAddress, spenderAddress, network = "ethereum" }) => {
+      try {
+        const allowance = await services.getERC20Allowance(tokenAddress, ownerAddress, spenderAddress, network);
+
+        return {
+          content: [{
+            type: "text",
+            text: JSON.stringify({
+              tokenAddress,
+              owner: ownerAddress,
+              spender: spenderAddress,
+              network,
+              allowance: {
+                raw: allowance.raw.toString(),
+                formatted: allowance.formatted,
+                symbol: allowance.token.symbol,
+                decimals: allowance.token.decimals
+              }
+            }, null, 2)
+          }]
+        };
+      } catch (error) {
+        return {
+          content: [{
+            type: "text",
+            text: `Error fetching token allowance: ${error instanceof Error ? error.message : String(error)}`
+          }],
+          isError: true
+        };
+      }
+    }
+  );
+
+  // Wait for transaction confirmation
+  server.tool(
+    "wait_for_transaction",
+    "Wait for a transaction to be confirmed on the blockchain. This is useful after sending a transaction to ensure it has been mined.",
+    {
+      txHash: z.string().describe("The transaction hash to wait for (e.g., '0x1234...')"),
+      network: z.string().optional().describe("Network name (e.g., 'ethereum', 'optimism', 'arbitrum', 'base', etc.) or chain ID. Defaults to Ethereum mainnet."),
+      confirmations: z.number().optional().describe("Number of block confirmations to wait for (default: 1)"),
+      timeout: z.number().optional().describe("Timeout in milliseconds (default: 60000)")
+    },
+    async ({ txHash, network = "ethereum", confirmations = 1, timeout = 60000 }) => {
+      try {
+        const receipt = await services.waitForTransaction(txHash as Hash, network, confirmations, timeout);
+
+        return {
+          content: [{
+            type: "text",
+            text: services.helpers.formatJson(receipt)
+          }]
+        };
+      } catch (error) {
+        return {
+          content: [{
+            type: "text",
+            text: `Error waiting for transaction: ${error instanceof Error ? error.message : String(error)}`
+          }],
+          isError: true
+        };
+      }
+    }
+  );
+
+  // Get gas price
+  server.tool(
+    "get_gas_price",
+    "Get the current gas price for a network. This helps estimate transaction costs.",
+    {
+      network: z.string().optional().describe("Network name (e.g., 'ethereum', 'optimism', 'arbitrum', 'base', etc.) or chain ID. Defaults to Ethereum mainnet.")
+    },
+    async ({ network = "ethereum" }) => {
+      try {
+        const gasPrice = await services.getGasPrice(network);
+
+        return {
+          content: [{
+            type: "text",
+            text: JSON.stringify({
+              network,
+              gasPrice: {
+                wei: gasPrice.wei.toString(),
+                gwei: gasPrice.gwei
+              }
+            }, null, 2)
+          }]
+        };
+      } catch (error) {
+        return {
+          content: [{
+            type: "text",
+            text: `Error fetching gas price: ${error instanceof Error ? error.message : String(error)}`
+          }],
+          isError: true
+        };
+      }
+    }
+  );
+
+  // Get estimated fees per gas (EIP-1559)
+  server.tool(
+    "estimate_fees_per_gas",
+    "Get estimated gas fees for EIP-1559 transactions (maxFeePerGas and maxPriorityFeePerGas). This is essential for modern Ethereum transactions.",
+    {
+      network: z.string().optional().describe("Network name (e.g., 'ethereum', 'optimism', 'arbitrum', 'base', etc.) or chain ID. Defaults to Ethereum mainnet.")
+    },
+    async ({ network = "ethereum" }) => {
+      try {
+        const fees = await services.estimateFeesPerGas(network);
+
+        return {
+          content: [{
+            type: "text",
+            text: JSON.stringify({
+              network,
+              maxFeePerGas: {
+                wei: fees.maxFeePerGas.wei.toString(),
+                gwei: fees.maxFeePerGas.gwei
+              },
+              maxPriorityFeePerGas: {
+                wei: fees.maxPriorityFeePerGas.wei.toString(),
+                gwei: fees.maxPriorityFeePerGas.gwei
+              }
+            }, null, 2)
+          }]
+        };
+      } catch (error) {
+        return {
+          content: [{
+            type: "text",
+            text: `Error estimating fees per gas: ${error instanceof Error ? error.message : String(error)}`
+          }],
+          isError: true
+        };
+      }
+    }
+  );
+
+  // Get contract events
+  server.tool(
+    "get_contract_events",
+    "Get events/logs emitted by a smart contract within a block range. Useful for tracking contract activity and state changes.",
+    {
+      contractAddress: z.string().describe("The contract address or ENS name to get events from"),
+      eventAbi: z.any().describe("The ABI definition of the event to filter for (as a JSON object)"),
+      fromBlock: z.union([z.number(), z.string()]).optional().describe("Starting block number or 'latest' (default: 'latest')"),
+      toBlock: z.union([z.number(), z.string()]).optional().describe("Ending block number or 'latest' (default: 'latest')"),
+      network: z.string().optional().describe("Network name (e.g., 'ethereum', 'optimism', 'arbitrum', 'base', etc.) or chain ID. Defaults to Ethereum mainnet.")
+    },
+    async ({ contractAddress, eventAbi, fromBlock = "latest", toBlock = "latest", network = "ethereum" }) => {
+      try {
+        const from = typeof fromBlock === 'number' ? BigInt(fromBlock) : fromBlock as 'latest';
+        const to = typeof toBlock === 'number' ? BigInt(toBlock) : toBlock as 'latest';
+
+        const logs = await services.getContractEvents(contractAddress, eventAbi, from, to, network);
+
+        return {
+          content: [{
+            type: "text",
+            text: services.helpers.formatJson(logs)
+          }]
+        };
+      } catch (error) {
+        return {
+          content: [{
+            type: "text",
+            text: `Error fetching contract events: ${error instanceof Error ? error.message : String(error)}`
+          }],
+          isError: true
+        };
+      }
+    }
+  );
+
+  // Batch read contracts
+  server.tool(
+    "batch_read_contracts",
+    "Read multiple smart contract functions in a single call. This is more efficient than making multiple individual read calls.",
+    {
+      calls: z.array(z.object({
+        address: z.string().describe("Contract address"),
+        abi: z.array(z.any()).describe("Contract ABI"),
+        functionName: z.string().describe("Function name to call"),
+        args: z.array(z.any()).optional().describe("Function arguments")
+      })).describe("Array of contract read calls to execute"),
+      network: z.string().optional().describe("Network name (e.g., 'ethereum', 'optimism', 'arbitrum', 'base', etc.) or chain ID. Defaults to Ethereum mainnet.")
+    },
+    async ({ calls, network = "ethereum" }) => {
+      try {
+        const formattedCalls = calls.map(call => ({
+          address: call.address as Address,
+          abi: call.abi,
+          functionName: call.functionName,
+          args: call.args || []
+        }));
+
+        const results = await services.batchReadContracts(formattedCalls, network);
+
+        return {
+          content: [{
+            type: "text",
+            text: services.helpers.formatJson(results)
+          }]
+        };
+      } catch (error) {
+        return {
+          content: [{
+            type: "text",
+            text: `Error executing batch read: ${error instanceof Error ? error.message : String(error)}`
           }],
           isError: true
         };

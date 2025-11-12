@@ -48,11 +48,11 @@ All services are exposed through a consistent interface of MCP tools and resourc
 - **Address balances** for native tokens and all token standards
 - **ENS resolution** for human-readable Ethereum addresses (use 'vitalik.eth' instead of '0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045')
 
-### Token services
+### Token Services
 
 - **ERC20 Tokens**
   - Get token metadata (name, symbol, decimals, supply)
-  - Check token balances
+  - Check token balances and allowances
   - Transfer tokens between addresses
   - Approve spending allowances
 
@@ -73,13 +73,22 @@ All services are exposed through a consistent interface of MCP tools and resourc
 - **Write services** with private key signing
 - **Contract verification** to distinguish from EOAs
 - **Event logs** retrieval and filtering
+- **Batch operations** for multiple contract reads
 
 ### Comprehensive Transaction Support
 
 - **Native token transfers** across all supported networks
 - **Gas estimation** for transaction planning
 - **Transaction status** and receipt information
+- **Transaction confirmation waiting** with configurable confirmations
 - **Error handling** with descriptive messages
+
+### Gas Price & Fee Management
+
+- **Current gas prices** in wei and gwei
+- **EIP-1559 fee estimation** (maxFeePerGas, maxPriorityFeePerGas)
+- **Fee history** for informed gas price decisions
+- **Network-specific gas optimization**
 
 ## 🌐 Supported Networks
 
@@ -390,12 +399,13 @@ console.log(result);
 
 The server provides the following MCP tools for agents. **All tools that accept address parameters support both Ethereum addresses and ENS names.**
 
-#### Token services
+#### Token Services
 
 | Tool Name | Description | Key Parameters |
 |-----------|-------------|----------------|
 | `get-token-info` | Get ERC20 token metadata | `tokenAddress` (address/ENS), `network` |
 | `get-token-balance` | Check ERC20 token balance | `tokenAddress` (address/ENS), `ownerAddress` (address/ENS), `network` |
+| `get-token-allowance` | Check ERC20 token allowance | `tokenAddress`, `ownerAddress`, `spenderAddress`, `network` |
 | `transfer-token` | Transfer ERC20 tokens | `privateKey`, `tokenAddress` (address/ENS), `toAddress` (address/ENS), `amount`, `network` |
 | `approve-token-spending` | Approve token allowances | `privateKey`, `tokenAddress` (address/ENS), `spenderAddress` (address/ENS), `amount`, `network` |
 | `get-nft-info` | Get NFT metadata | `tokenAddress` (address/ENS), `tokenId`, `network` |
@@ -406,7 +416,7 @@ The server provides the following MCP tools for agents. **All tools that accept 
 | `get-erc1155-balance` | Check ERC1155 balance | `tokenAddress` (address/ENS), `tokenId`, `ownerAddress` (address/ENS), `network` |
 | `transfer-erc1155` | Transfer ERC1155 tokens | `privateKey`, `tokenAddress` (address/ENS), `tokenId`, `amount`, `toAddress` (address/ENS), `network` |
 
-#### Blockchain services
+#### Blockchain Services
 
 | Tool Name | Description | Key Parameters |
 |-----------|-------------|----------------|
@@ -414,10 +424,21 @@ The server provides the following MCP tools for agents. **All tools that accept 
 | `get-balance` | Get native token balance | `address` (address/ENS), `network` |
 | `transfer-eth` | Send native tokens | `privateKey`, `to` (address/ENS), `amount`, `network` |
 | `get-transaction` | Get transaction details | `txHash`, `network` |
+| `wait-for-transaction` | Wait for transaction confirmation | `txHash`, `network`, `confirmations`, `timeout` |
 | `read-contract` | Read smart contract state | `contractAddress` (address/ENS), `abi`, `functionName`, `args`, `network` |
 | `write-contract` | Write to smart contract | `contractAddress` (address/ENS), `abi`, `functionName`, `args`, `privateKey`, `network` |
+| `batch-read-contracts` | Read multiple contracts in one call | `calls[]`, `network` |
+| `get-contract-events` | Get contract event logs | `contractAddress`, `eventAbi`, `fromBlock`, `toBlock`, `network` |
 | `is-contract` | Check if address is a contract | `address` (address/ENS), `network` |
 | `resolve-ens` | Resolve ENS name to address | `ensName`, `network` |
+
+#### Gas & Fee Tools
+
+| Tool Name | Description | Key Parameters |
+|-----------|-------------|----------------|
+| `get-gas-price` | Get current gas price | `network` |
+| `estimate-fees-per-gas` | Get EIP-1559 fee estimates | `network` |
+| `estimate-gas` | Estimate gas for a transaction | `to`, `value`, `data`, `network` |
 
 ### Resources
 

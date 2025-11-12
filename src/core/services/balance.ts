@@ -31,6 +31,16 @@ const erc20Abi = [
     outputs: [{ type: 'uint256' }],
     stateMutability: 'view',
     type: 'function'
+  },
+  {
+    inputs: [
+      { type: 'address', name: 'owner' },
+      { type: 'address', name: 'spender' }
+    ],
+    name: 'allowance',
+    outputs: [{ type: 'uint256' }],
+    stateMutability: 'view',
+    type: 'function'
   }
 ] as const;
 
@@ -209,11 +219,61 @@ export async function getERC1155Balance(
   // Resolve ENS names to addresses if needed
   const tokenAddress = await resolveAddress(tokenAddressOrEns, network);
   const ownerAddress = await resolveAddress(ownerAddressOrEns, network);
-  
+
   return readContract({
     address: tokenAddress,
     abi: erc1155Abi,
     functionName: 'balanceOf',
     args: [ownerAddress, tokenId]
   }, network) as Promise<bigint>;
+}
+
+/**
+ * Get the allowance of an ERC20 token for a spender
+ * @param tokenAddressOrEns Token contract address or ENS name
+ * @param ownerAddressOrEns Owner address or ENS name
+ * @param spenderAddressOrEns Spender address or ENS name
+ * @param network Network name or chain ID
+ * @returns Allowance information
+ */
+export async function getERC20Allowance(
+  tokenAddressOrEns: string,
+  ownerAddressOrEns: string,
+  spenderAddressOrEns: string,
+  network = 'ethereum'
+): Promise<{
+  raw: bigint;
+  formatted: string;
+  token: {
+    symbol: string;
+    decimals: number;
+  }
+}> {
+  // Resolve ENS names to addresses if needed
+  const tokenAddress = await resolveAddress(tokenAddressOrEns, network);
+  const ownerAddress = await resolveAddress(ownerAddressOrEns, network);
+  const spenderAddress = await resolveAddress(spenderAddressOrEns, network);
+
+  const publicClient = getPublicClient(network);
+
+  const contract = getContract({
+    address: tokenAddress,
+    abi: erc20Abi,
+    client: publicClient,
+  });
+
+  const [allowance, symbol, decimals] = await Promise.all([
+    contract.read.allowance([ownerAddress, spenderAddress]),
+    contract.read.symbol(),
+    contract.read.decimals()
+  ]);
+
+  return {
+    raw: allowance,
+    formatted: formatUnits(allowance, decimals),
+    token: {
+      symbol,
+      decimals
+    }
+  };
 } 
