@@ -21,6 +21,8 @@
     "dev": "bun --watch src/index.ts",
     "start:http": "bun run src/server/http-server.ts",
     "dev:http": "bun --watch src/server/http-server.ts",
+    "test": "bun test",
+    "test:watch": "bun test --watch",
     "prepublishOnly": "bun run build && bun run build:http",
     "version:patch": "npm version patch",
     "version:minor": "npm version minor",
