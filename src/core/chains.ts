@@ -56,7 +56,8 @@ import {
   celoAlfajores,
   goerli,
   holesky,
-  flowTestnet
+  flowTestnet,
+  filecoinCalibration
 } from 'viem/chains';
 
 // Default configuration values
@@ -122,6 +123,7 @@ export const chainMap: Record<number, Chain> = {
   5: goerli,
   17000: holesky,
   545: flowTestnet,
+  314159: filecoinCalibration,
 };
 
 // Map network names to chain IDs for easier reference
@@ -215,6 +217,7 @@ export const networkNameMap: Record<string, number> = {
   'goerli': 5,
   'holesky': 17000,
   'flow-testnet': 545,
+  'filecoin-calibration': 314159,
 };
 
 // Map chain IDs to RPC URLs
@@ -276,6 +279,7 @@ export const rpcUrlMap: Record<number, string> = {
   5: 'https://rpc.ankr.com/eth_goerli',
   17000: 'https://ethereum-holesky.publicnode.com',
   545: 'https://testnet.evm.nodes.onflow.org',
+  314159: 'https://api.calibration.node.glif.io/rpc/v1',
 };
 
 /**

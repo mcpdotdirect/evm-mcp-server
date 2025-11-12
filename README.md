@@ -148,6 +148,7 @@ All services are exposed through a consistent interface of MCP tools and resourc
 - Goerli
 - Holesky
 - Flow Testnet
+- Filecoin Calibration
 - Lumia Testnet
 
 ## 🛠️ Prerequisites
