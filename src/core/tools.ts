@@ -3,8 +3,8 @@ import { z } from "zod";
 import { getSupportedNetworks, getRpcUrl } from "./chains.js";
 import * as services from "./services/index.js";
 import { type Address, type Hex, type Hash } from 'viem';
-import { normalize } from 'viem/ens';
 import { privateKeyToAccount } from 'viem/accounts';
+import { normalize } from 'viem/ens';
 
 /**
  * Register all EVM-related tools with the MCP server
@@ -19,13 +19,26 @@ import { privateKeyToAccount } from 'viem/accounts';
  * @param server The MCP server instance
  */
 export function registerEVMTools(server: McpServer) {
-  // Helper to get the configured wallet from environment
-  const getConfiguredWallet = () => {
+  // Helper to get the configured private key from environment
+  const getConfiguredPrivateKey = (): Hex => {
     const privateKey = process.env.EVM_PRIVATE_KEY;
     if (!privateKey) {
       throw new Error("EVM_PRIVATE_KEY environment variable is not set. Configure it to enable write operations.");
     }
-    return privateKeyToAccount(privateKey as Hex);
+    // Ensure 0x prefix
+    return (privateKey.startsWith('0x') ? privateKey : `0x${privateKey}`) as Hex;
+  };
+
+  // Helper to get wallet address from private key
+  const getWalletAddressFromKey = (): Address => {
+    const privateKey = getConfiguredPrivateKey();
+    const account = privateKeyToAccount(privateKey);
+    return account.address;
+  };
+
+  // Helper to get configured wallet object
+  const getConfiguredWallet = (): { address: Address } => {
+    return { address: getWalletAddressFromKey() };
   };
 
   // ============================================================================
@@ -47,12 +60,12 @@ export function registerEVMTools(server: McpServer) {
     },
     async () => {
       try {
-        const wallet = getConfiguredWallet();
+        const address = getWalletAddressFromKey();
         return {
           content: [{
             type: "text",
             text: JSON.stringify({
-              address: wallet.address,
+              address,
               message: "This is the wallet that will be used for all transactions"
             }, null, 2)
           }]
@@ -606,10 +619,10 @@ export function registerEVMTools(server: McpServer) {
   server.registerTool(
     "get_contract_abi",
     {
-      description: "Fetch a contract's ABI from a block explorer (Etherscan, Polygonscan, etc.). Requires ETHERSCAN_API_KEY environment variable.",
+      description: "Fetch a contract's full ABI from Etherscan/block explorers. Use this to understand verified contracts before interacting. Requires ETHERSCAN_API_KEY. Supports 30+ EVM networks. Works best with verified contracts on block explorers.",
       inputSchema: {
         contractAddress: z.string().describe("The contract address (0x...)"),
-        network: z.string().optional().describe("Network name. Defaults to Ethereum mainnet. Supported: ethereum, polygon, arbitrum, optimism, base, avalanche, etc.")
+        network: z.string().optional().describe("Network name or chain ID. Defaults to ethereum. Supported: ethereum, polygon, arbitrum, optimism, base, avalanche, gnosis, fantom, bsc, celo, scroll, linea, zksync, manta, blast, and testnets (sepolia, mumbai, arbitrum-sepolia, optimism-sepolia, base-sepolia, avalanche-fuji)")
       },
       annotations: {
         title: "Get Contract ABI",
@@ -650,12 +663,12 @@ export function registerEVMTools(server: McpServer) {
   server.registerTool(
     "read_contract",
     {
-      description: "Read data from a smart contract (read-only call). Can auto-fetch verified contract ABIs or use common function signatures.",
+      description: "Call read-only functions on a smart contract. Automatically fetches ABI from block explorer if not provided (requires ETHERSCAN_API_KEY). Falls back to common functions if contract is not verified. Use this to query contract state and data.",
       inputSchema: {
         contractAddress: z.string().describe("The contract address"),
-        functionName: z.string().describe("Function name (e.g., 'name', 'symbol', 'balanceOf', 'totalSupply')"),
-        args: z.array(z.string()).optional().describe("Function arguments as strings"),
-        abiJson: z.string().optional().describe("Full contract ABI as JSON string (optional - will try to auto-fetch if not provided)"),
+        functionName: z.string().describe("Function name (e.g., 'name', 'symbol', 'balanceOf', 'totalSupply', 'owner')"),
+        args: z.array(z.string()).optional().describe("Function arguments as strings (e.g., ['0xAddress'] for balanceOf)"),
+        abiJson: z.string().optional().describe("Full contract ABI as JSON string (optional - will auto-fetch verified contract ABI if not provided)"),
         network: z.string().optional().describe("Network name or chain ID. Defaults to Ethereum mainnet.")
       },
       annotations: {
@@ -775,14 +788,15 @@ export function registerEVMTools(server: McpServer) {
     },
     async ({ to, amount, network = "ethereum" }) => {
       try {
-        const wallet = getConfiguredWallet();
-        const txHash = await services.transferETH(wallet, to as Address, amount, network);
+        const privateKey = getConfiguredPrivateKey();
+        const senderAddress = getWalletAddressFromKey();
+        const txHash = await services.transferETH(privateKey, to as Address, amount, network);
         return {
           content: [{
             type: "text",
             text: JSON.stringify({
               network,
-              from: wallet.address,
+              from: senderAddress,
               to,
               amount,
               txHash,
@@ -819,18 +833,21 @@ export function registerEVMTools(server: McpServer) {
     },
     async ({ tokenAddress, to, amount, network = "ethereum" }) => {
       try {
-        const wallet = getConfiguredWallet();
-        const txHash = await services.transferERC20(wallet, tokenAddress as Address, to as Address, amount, network);
+        const privateKey = getConfiguredPrivateKey();
+        const senderAddress = getWalletAddressFromKey();
+        const result = await services.transferERC20(tokenAddress as Address, to as Address, amount, privateKey, network);
         return {
           content: [{
             type: "text",
             text: JSON.stringify({
               network,
               tokenAddress,
-              from: wallet.address,
+              from: senderAddress,
               to,
-              amount,
-              txHash,
+              amount: result.amount.formatted,
+              symbol: result.token.symbol,
+              decimals: result.token.decimals,
+              txHash: result.txHash,
               message: "Transaction sent. Use get_transaction_receipt to check confirmation."
             }, null, 2)
           }]
@@ -864,14 +881,16 @@ export function registerEVMTools(server: McpServer) {
     },
     async ({ tokenAddress, spenderAddress, amount, network = "ethereum" }) => {
       try {
-        const wallet = getConfiguredWallet();
-        const txHash = await services.approveERC20(wallet, tokenAddress as Address, spenderAddress as Address, amount, network);
+        const privateKey = getConfiguredPrivateKey();
+        const senderAddress = getWalletAddressFromKey();
+        const txHash = await services.approveERC20(privateKey, tokenAddress as Address, spenderAddress as Address, amount, network);
         return {
           content: [{
             type: "text",
             text: JSON.stringify({
               network,
               tokenAddress,
+              owner: senderAddress,
               spender: spenderAddress,
               approvalAmount: amount,
               txHash,
