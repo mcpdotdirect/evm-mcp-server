@@ -7,22 +7,40 @@ import { getSupportedNetworks } from "../core/chains.js";
 // Create and start the MCP server
 async function startServer() {
   try {
-    // Create a new MCP server instance
-    const server = new McpServer({
-      name: "EVM-Server",
-      version: "1.0.0"
-    });
+    // Create a new MCP server instance with capabilities
+    const server = new McpServer(
+      {
+        name: "evm-mcp-server",
+        version: "2.0.0"
+      },
+      {
+        capabilities: {
+          tools: {
+            listChanged: true
+          },
+          resources: {
+            subscribe: false,
+            listChanged: true
+          },
+          prompts: {
+            listChanged: true
+          },
+          logging: {}
+        }
+      }
+    );
 
     // Register all resources, tools, and prompts
     registerEVMResources(server);
     registerEVMTools(server);
     registerEVMPrompts(server);
-    
+
     // Log server information
-    console.error(`EVM MCP Server initialized`);
-    console.error(`Supported networks: ${getSupportedNetworks().join(", ")}`);
+    console.error(`EVM MCP Server v2.0.0 initialized`);
+    console.error(`Protocol: MCP 2025-06-18`);
+    console.error(`Supported networks: ${getSupportedNetworks().length} networks`);
     console.error("Server is ready to handle requests");
-    
+
     return server;
   } catch (error) {
     console.error("Failed to initialize server:", error);
@@ -31,4 +49,4 @@ async function startServer() {
 }
 
 // Export the server creation function
-export default startServer; 
+export default startServer;

@@ -7,19 +7,21 @@ import { z } from "zod";
  */
 export function registerEVMPrompts(server: McpServer) {
   // Basic block explorer prompt
-  server.prompt(
+  server.registerPrompt(
     "explore_block",
-    "Explore information about a specific block",
     {
-      blockNumber: z.string().optional().describe("Block number to explore. If not provided, latest block will be used."),
-      network: z.string().optional().describe("Network name (e.g., 'ethereum', 'optimism', 'arbitrum', 'base', etc.) or chain ID. Supports all EVM-compatible networks. Defaults to Ethereum mainnet.")
+      description: "Explore information about a specific block",
+      argsSchema: {
+        blockNumber: z.string().optional().describe("Block number to explore. If not provided, latest block will be used."),
+        network: z.string().optional().describe("Network name or chain ID. Defaults to Ethereum mainnet.")
+      }
     },
     ({ blockNumber, network = "ethereum" }) => ({
       messages: [{
         role: "user",
         content: {
           type: "text",
-          text: blockNumber 
+          text: blockNumber
             ? `Please analyze block #${blockNumber} on the ${network} network and provide information about its key metrics, transactions, and significance.`
             : `Please analyze the latest block on the ${network} network and provide information about its key metrics, transactions, and significance.`
         }
@@ -28,12 +30,14 @@ export function registerEVMPrompts(server: McpServer) {
   );
 
   // Transaction analysis prompt
-  server.prompt(
+  server.registerPrompt(
     "analyze_transaction",
-    "Analyze a specific transaction",
     {
-      txHash: z.string().describe("Transaction hash to analyze"),
-      network: z.string().optional().describe("Network name (e.g., 'ethereum', 'optimism', 'arbitrum', 'base', etc.) or chain ID. Supports all EVM-compatible networks. Defaults to Ethereum mainnet.")
+      description: "Analyze a specific transaction",
+      argsSchema: {
+        txHash: z.string().describe("Transaction hash to analyze"),
+        network: z.string().optional().describe("Network name or chain ID. Defaults to Ethereum mainnet.")
+      }
     },
     ({ txHash, network = "ethereum" }) => ({
       messages: [{
@@ -47,12 +51,14 @@ export function registerEVMPrompts(server: McpServer) {
   );
 
   // Address analysis prompt
-  server.prompt(
+  server.registerPrompt(
     "analyze_address",
-    "Analyze an EVM address",
     {
-      address: z.string().describe("Ethereum address to analyze"),
-      network: z.string().optional().describe("Network name (e.g., 'ethereum', 'optimism', 'arbitrum', 'base', etc.) or chain ID. Supports all EVM-compatible networks. Defaults to Ethereum mainnet.")
+      description: "Analyze an EVM address",
+      argsSchema: {
+        address: z.string().describe("Ethereum address to analyze"),
+        network: z.string().optional().describe("Network name or chain ID. Defaults to Ethereum mainnet.")
+      }
     },
     ({ address, network = "ethereum" }) => ({
       messages: [{
@@ -66,13 +72,15 @@ export function registerEVMPrompts(server: McpServer) {
   );
 
   // Smart contract interaction guidance
-  server.prompt(
+  server.registerPrompt(
     "interact_with_contract",
-    "Get guidance on interacting with a smart contract",
     {
-      contractAddress: z.string().describe("The contract address"),
-      abiJson: z.string().optional().describe("The contract ABI as a JSON string"),
-      network: z.string().optional().describe("Network name or chain ID. Defaults to Ethereum mainnet.")
+      description: "Get guidance on interacting with a smart contract",
+      argsSchema: {
+        contractAddress: z.string().describe("The contract address"),
+        abiJson: z.string().optional().describe("The contract ABI as a JSON string"),
+        network: z.string().optional().describe("Network name or chain ID. Defaults to Ethereum mainnet.")
+      }
     },
     ({ contractAddress, abiJson, network = "ethereum" }) => ({
       messages: [{
@@ -80,7 +88,7 @@ export function registerEVMPrompts(server: McpServer) {
         content: {
           type: "text",
           text: abiJson
-            ? `I need to interact with the smart contract at address ${contractAddress} on the ${network} network. Here's the ABI:\n\n${abiJson}\n\nPlease analyze this contract's functions and provide guidance on how to interact with it safely. Explain what each function does and what parameters it requires.`
+            ? `I need to interact with the smart contract at address ${contractAddress} on the ${network} network. Here's the ABI:\n\n${abiJson}\n\nPlease analyze this contract's functions and provide guidance on how to interact with it safely.`
             : `I need to interact with the smart contract at address ${contractAddress} on the ${network} network. Please help me understand what this contract does and how I can interact with it safely.`
         }
       }]
@@ -88,11 +96,13 @@ export function registerEVMPrompts(server: McpServer) {
   );
 
   // EVM concept explanation
-  server.prompt(
+  server.registerPrompt(
     "explain_evm_concept",
-    "Get an explanation of an EVM concept",
     {
-      concept: z.string().describe("The EVM concept to explain (e.g., gas, nonce, etc.)")
+      description: "Get an explanation of an EVM concept",
+      argsSchema: {
+        concept: z.string().describe("The EVM concept to explain (e.g., gas, nonce, etc.)")
+      }
     },
     ({ concept }) => ({
       messages: [{
@@ -106,11 +116,13 @@ export function registerEVMPrompts(server: McpServer) {
   );
 
   // Network comparison
-  server.prompt(
+  server.registerPrompt(
     "compare_networks",
-    "Compare different EVM-compatible networks",
     {
-      networkList: z.string().describe("Comma-separated list of networks to compare (e.g., 'ethereum,optimism,arbitrum')")
+      description: "Compare different EVM-compatible networks",
+      argsSchema: {
+        networkList: z.string().describe("Comma-separated list of networks to compare")
+      }
     },
     ({ networkList }) => {
       const networks = networkList.split(',').map(n => n.trim());
@@ -127,24 +139,26 @@ export function registerEVMPrompts(server: McpServer) {
   );
 
   // Token analysis prompt
-  server.prompt(
+  server.registerPrompt(
     "analyze_token",
-    "Analyze an ERC20 or NFT token",
     {
-      tokenAddress: z.string().describe("Token contract address to analyze"),
-      tokenType: z.string().optional().describe("Type of token to analyze (erc20, erc721/nft, or auto-detect). Defaults to auto."),
-      tokenId: z.string().optional().describe("Token ID (required for NFT analysis)"),
-      network: z.string().optional().describe("Network name (e.g., 'ethereum', 'optimism', 'arbitrum', 'base', etc.) or chain ID. Supports all EVM-compatible networks. Defaults to Ethereum mainnet.")
+      description: "Analyze an ERC20 or NFT token",
+      argsSchema: {
+        tokenAddress: z.string().describe("Token contract address to analyze"),
+        tokenType: z.string().optional().describe("Type of token (erc20, erc721/nft, or auto-detect)"),
+        tokenId: z.string().optional().describe("Token ID (required for NFT analysis)"),
+        network: z.string().optional().describe("Network name or chain ID. Defaults to Ethereum mainnet.")
+      }
     },
     ({ tokenAddress, tokenType = "auto", tokenId, network = "ethereum" }) => {
       let promptText = "";
-      
+
       if (tokenType === "erc20" || tokenType === "auto") {
-        promptText = `Please analyze the ERC20 token at address ${tokenAddress} on the ${network} network. Provide information about its name, symbol, total supply, and any other relevant details. If possible, explain the token's purpose, utility, and market context.`;
+        promptText = `Please analyze the ERC20 token at address ${tokenAddress} on the ${network} network. Provide information about its name, symbol, total supply, and any other relevant details.`;
       } else if ((tokenType === "erc721" || tokenType === "nft") && tokenId) {
-        promptText = `Please analyze the NFT with token ID ${tokenId} from the collection at address ${tokenAddress} on the ${network} network. Provide information about the collection name, token details, ownership history if available, and any other relevant information about this specific NFT.`;
+        promptText = `Please analyze the NFT with token ID ${tokenId} from the collection at address ${tokenAddress} on the ${network} network. Provide information about the collection name, token details, and any other relevant information.`;
       } else if (tokenType === "nft" || tokenType === "erc721") {
-        promptText = `Please analyze the NFT collection at address ${tokenAddress} on the ${network} network. Provide information about the collection name, symbol, total supply if available, floor price if available, and any other relevant details about this NFT collection.`;
+        promptText = `Please analyze the NFT collection at address ${tokenAddress} on the ${network} network. Provide information about the collection name, symbol, total supply if available, and any other relevant details.`;
       }
 
       return {
@@ -158,5 +172,4 @@ export function registerEVMPrompts(server: McpServer) {
       };
     }
   );
-
-} 
+}

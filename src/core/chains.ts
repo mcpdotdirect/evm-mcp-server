@@ -296,8 +296,9 @@ export function resolveChainId(chainIdentifier: number | string): number {
   const networkName = chainIdentifier.toLowerCase();
   
   // Check if the network name is in our map
-  if (networkName in networkNameMap) {
-    return networkNameMap[networkName];
+  const chainId = networkNameMap[networkName];
+  if (chainId !== undefined) {
+    return chainId;
   }
   
   // Try parsing as a number
