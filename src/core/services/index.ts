@@ -7,6 +7,7 @@ export * from './transactions.js';
 export * from './contracts.js';
 export * from './tokens.js';
 export * from './ens.js';
+export * from './abi.js';
 export { utils as helpers } from './utils.js';
 
 // Re-export common types for convenience

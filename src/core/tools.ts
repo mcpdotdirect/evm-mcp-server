@@ -4,16 +4,68 @@ import { getSupportedNetworks, getRpcUrl } from "./chains.js";
 import * as services from "./services/index.js";
 import { type Address, type Hex, type Hash } from 'viem';
 import { normalize } from 'viem/ens';
+import { privateKeyToAccount } from 'viem/accounts';
 
 /**
  * Register all EVM-related tools with the MCP server
  *
- * All tools that accept Ethereum addresses also support ENS names (e.g., 'vitalik.eth').
+ * SECURITY: The EVM_PRIVATE_KEY environment variable must be set for write operations.
+ * Private keys are never passed as tool arguments for security reasons.
+ * Tools will use the configured wallet for all transactions.
+ *
+ * All tools that accept addresses also support ENS names (e.g., 'vitalik.eth').
  * ENS names are automatically resolved to addresses using the Ethereum Name Service.
  *
  * @param server The MCP server instance
  */
 export function registerEVMTools(server: McpServer) {
+  // Helper to get the configured wallet from environment
+  const getConfiguredWallet = () => {
+    const privateKey = process.env.EVM_PRIVATE_KEY;
+    if (!privateKey) {
+      throw new Error("EVM_PRIVATE_KEY environment variable is not set. Configure it to enable write operations.");
+    }
+    return privateKeyToAccount(privateKey as Hex);
+  };
+
+  // ============================================================================
+  // WALLET INFORMATION TOOLS (Read-only)
+  // ============================================================================
+
+  server.registerTool(
+    "get_wallet_address",
+    {
+      description: "Get the address of the configured wallet. Use this to verify which wallet is active.",
+      inputSchema: {},
+      annotations: {
+        title: "Get Wallet Address",
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false
+      }
+    },
+    async () => {
+      try {
+        const wallet = getConfiguredWallet();
+        return {
+          content: [{
+            type: "text",
+            text: JSON.stringify({
+              address: wallet.address,
+              message: "This is the wallet that will be used for all transactions"
+            }, null, 2)
+          }]
+        };
+      } catch (error) {
+        return {
+          content: [{ type: "text", text: `Error: ${error instanceof Error ? error.message : String(error)}` }],
+          isError: true
+        };
+      }
+    }
+  );
+
   // ============================================================================
   // NETWORK INFORMATION TOOLS (Read-only)
   // ============================================================================
@@ -21,9 +73,9 @@ export function registerEVMTools(server: McpServer) {
   server.registerTool(
     "get_chain_info",
     {
-      description: "Get information about an EVM network including chain ID, block number, and RPC URL",
+      description: "Get information about an EVM network: chain ID, current block number, and RPC endpoint",
       inputSchema: {
-        network: z.string().optional().describe("Network name (e.g., 'ethereum', 'optimism', 'arbitrum', 'base', etc.) or chain ID. Defaults to Ethereum mainnet.")
+        network: z.string().optional().describe("Network name (e.g., 'ethereum', 'optimism', 'arbitrum', 'base') or chain ID. Defaults to Ethereum mainnet.")
       },
       annotations: {
         title: "Get Chain Info",
@@ -75,7 +127,7 @@ export function registerEVMTools(server: McpServer) {
         };
       } catch (error) {
         return {
-          content: [{ type: "text", text: `Error fetching supported networks: ${error instanceof Error ? error.message : String(error)}` }],
+          content: [{ type: "text", text: `Error: ${error instanceof Error ? error.message : String(error)}` }],
           isError: true
         };
       }
@@ -83,7 +135,54 @@ export function registerEVMTools(server: McpServer) {
   );
 
   server.registerTool(
-    "resolve_ens",
+    "get_gas_price",
+    {
+      description: "Get current gas prices (base fee, standard, and fast) for a network",
+      inputSchema: {
+        network: z.string().optional().describe("Network name or chain ID. Defaults to Ethereum mainnet.")
+      },
+      annotations: {
+        title: "Get Gas Prices",
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: false,
+        openWorldHint: true
+      }
+    },
+    async ({ network = "ethereum" }) => {
+      try {
+        const client = await services.getPublicClient(network);
+        const [baseFee, priorityFee] = await Promise.all([
+          client.getGasPrice(),
+          client.estimateMaxPriorityFeePerGas()
+        ]);
+
+        return {
+          content: [{
+            type: "text",
+            text: JSON.stringify({
+              network,
+              baseFeePerGas: baseFee.toString(),
+              priorityFeePerGas: priorityFee?.toString() || "N/A",
+              currency: "wei"
+            }, null, 2)
+          }]
+        };
+      } catch (error) {
+        return {
+          content: [{ type: "text", text: `Error fetching gas prices: ${error instanceof Error ? error.message : String(error)}` }],
+          isError: true
+        };
+      }
+    }
+  );
+
+  // ============================================================================
+  // ENS TOOLS (Read-only)
+  // ============================================================================
+
+  server.registerTool(
+    "resolve_ens_name",
     {
       description: "Resolve an ENS name to an Ethereum address",
       inputSchema: {
@@ -102,7 +201,7 @@ export function registerEVMTools(server: McpServer) {
       try {
         if (!ensName.includes('.')) {
           return {
-            content: [{ type: "text", text: `Error: Input "${ensName}" is not a valid ENS name. ENS names must contain a dot (e.g., 'name.eth').` }],
+            content: [{ type: "text", text: `Error: "${ensName}" is not a valid ENS name. ENS names must contain a dot (e.g., 'name.eth').` }],
             isError: true
           };
         }
@@ -110,11 +209,60 @@ export function registerEVMTools(server: McpServer) {
         const address = await services.resolveAddress(ensName, network);
 
         return {
-          content: [{ type: "text", text: JSON.stringify({ ensName, normalizedName: normalizedEns, resolvedAddress: address, network }, null, 2) }]
+          content: [{
+            type: "text",
+            text: JSON.stringify({
+              ensName,
+              normalizedName: normalizedEns,
+              resolvedAddress: address,
+              network
+            }, null, 2)
+          }]
         };
       } catch (error) {
         return {
           content: [{ type: "text", text: `Error resolving ENS name: ${error instanceof Error ? error.message : String(error)}` }],
+          isError: true
+        };
+      }
+    }
+  );
+
+  server.registerTool(
+    "lookup_ens_address",
+    {
+      description: "Lookup the ENS name for an Ethereum address (reverse resolution)",
+      inputSchema: {
+        address: z.string().describe("Ethereum address to lookup"),
+        network: z.string().optional().describe("Network name or chain ID. Defaults to Ethereum mainnet.")
+      },
+      annotations: {
+        title: "Lookup ENS Address",
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: true
+      }
+    },
+    async ({ address, network = "ethereum" }) => {
+      try {
+        const client = await services.getPublicClient(network);
+        const ensName = await client.getEnsName({
+          address: address as Address
+        });
+        return {
+          content: [{
+            type: "text",
+            text: JSON.stringify({
+              address,
+              ensName: ensName || "No ENS name found",
+              network
+            }, null, 2)
+          }]
+        };
+      } catch (error) {
+        return {
+          content: [{ type: "text", text: `Error looking up ENS name: ${error instanceof Error ? error.message : String(error)}` }],
           isError: true
         };
       }
@@ -126,28 +274,35 @@ export function registerEVMTools(server: McpServer) {
   // ============================================================================
 
   server.registerTool(
-    "get_block_by_number",
+    "get_block",
     {
-      description: "Get a block by its block number",
+      description: "Get block details by block number or hash",
       inputSchema: {
-        blockNumber: z.number().describe("The block number to fetch"),
+        blockIdentifier: z.string().describe("Block number (as string) or block hash"),
         network: z.string().optional().describe("Network name or chain ID. Defaults to Ethereum mainnet.")
       },
       annotations: {
-        title: "Get Block by Number",
+        title: "Get Block",
         readOnlyHint: true,
         destructiveHint: false,
         idempotentHint: true,
         openWorldHint: true
       }
     },
-    async ({ blockNumber, network = "ethereum" }) => {
+    async ({ blockIdentifier, network = "ethereum" }) => {
       try {
-        const block = await services.getBlockByNumber(blockNumber, network);
+        let block;
+        if (blockIdentifier.startsWith("0x") && blockIdentifier.length === 66) {
+          // It's a hash
+          block = await services.getBlockByHash(blockIdentifier as Hash, network);
+        } else {
+          // It's a number
+          block = await services.getBlockByNumber(parseInt(blockIdentifier), network);
+        }
         return { content: [{ type: "text", text: services.helpers.formatJson(block) }] };
       } catch (error) {
         return {
-          content: [{ type: "text", text: `Error fetching block ${blockNumber}: ${error instanceof Error ? error.message : String(error)}` }],
+          content: [{ type: "text", text: `Error fetching block: ${error instanceof Error ? error.message : String(error)}` }],
           isError: true
         };
       }
@@ -157,7 +312,7 @@ export function registerEVMTools(server: McpServer) {
   server.registerTool(
     "get_latest_block",
     {
-      description: "Get the latest block from the EVM network",
+      description: "Get the latest block from the network",
       inputSchema: {
         network: z.string().optional().describe("Network name or chain ID. Defaults to Ethereum mainnet.")
       },
@@ -191,11 +346,11 @@ export function registerEVMTools(server: McpServer) {
     {
       description: "Get the native token balance (ETH, MATIC, etc.) for an address",
       inputSchema: {
-        address: z.string().describe("The wallet address or ENS name to check the balance for"),
+        address: z.string().describe("The wallet address or ENS name"),
         network: z.string().optional().describe("Network name or chain ID. Defaults to Ethereum mainnet.")
       },
       annotations: {
-        title: "Get Native Balance",
+        title: "Get Native Token Balance",
         readOnlyHint: true,
         destructiveHint: false,
         idempotentHint: true,
@@ -204,9 +359,16 @@ export function registerEVMTools(server: McpServer) {
     },
     async ({ address, network = "ethereum" }) => {
       try {
-        const balance = await services.getETHBalance(address, network);
+        const balance = await services.getETHBalance(address as Address, network);
         return {
-          content: [{ type: "text", text: JSON.stringify({ address, network, wei: balance.wei.toString(), ether: balance.ether }, null, 2) }]
+          content: [{
+            type: "text",
+            text: JSON.stringify({
+              network,
+              address,
+              balance: { wei: balance.wei.toString(), ether: balance.ether }
+            }, null, 2)
+          }]
         };
       } catch (error) {
         return {
@@ -218,16 +380,16 @@ export function registerEVMTools(server: McpServer) {
   );
 
   server.registerTool(
-    "get_erc20_balance",
+    "get_token_balance",
     {
-      description: "Get the ERC20 token balance of an address",
+      description: "Get the ERC20 token balance for an address",
       inputSchema: {
-        address: z.string().describe("The address to check"),
+        address: z.string().describe("The wallet address or ENS name"),
         tokenAddress: z.string().describe("The ERC20 token contract address"),
         network: z.string().optional().describe("Network name or chain ID. Defaults to Ethereum mainnet.")
       },
       annotations: {
-        title: "Get ERC20 Balance",
+        title: "Get ERC20 Token Balance",
         readOnlyHint: true,
         destructiveHint: false,
         idempotentHint: true,
@@ -241,47 +403,15 @@ export function registerEVMTools(server: McpServer) {
           content: [{
             type: "text",
             text: JSON.stringify({
-              address, tokenAddress, network,
-              balance: { raw: balance.raw.toString(), formatted: balance.formatted, decimals: balance.token.decimals }
-            }, null, 2)
-          }]
-        };
-      } catch (error) {
-        return {
-          content: [{ type: "text", text: `Error fetching ERC20 balance: ${error instanceof Error ? error.message : String(error)}` }],
-          isError: true
-        };
-      }
-    }
-  );
-
-  server.registerTool(
-    "get_token_balance",
-    {
-      description: "Get the balance of an ERC20 token for an address",
-      inputSchema: {
-        tokenAddress: z.string().describe("The contract address of the ERC20 token"),
-        ownerAddress: z.string().describe("The wallet address or ENS name to check the balance for"),
-        network: z.string().optional().describe("Network name or chain ID. Defaults to Ethereum mainnet.")
-      },
-      annotations: {
-        title: "Get Token Balance",
-        readOnlyHint: true,
-        destructiveHint: false,
-        idempotentHint: true,
-        openWorldHint: true
-      }
-    },
-    async ({ tokenAddress, ownerAddress, network = "ethereum" }) => {
-      try {
-        const balance = await services.getERC20Balance(tokenAddress, ownerAddress, network);
-        return {
-          content: [{
-            type: "text",
-            text: JSON.stringify({
-              tokenAddress, owner: ownerAddress, network,
-              raw: balance.raw.toString(), formatted: balance.formatted,
-              symbol: balance.token.symbol, decimals: balance.token.decimals
+              network,
+              tokenAddress,
+              address,
+              balance: {
+                raw: balance.raw.toString(),
+                formatted: balance.formatted,
+                symbol: balance.token.symbol,
+                decimals: balance.token.decimals
+              }
             }, null, 2)
           }]
         };
@@ -295,64 +425,62 @@ export function registerEVMTools(server: McpServer) {
   );
 
   server.registerTool(
-    "get_nft_balance",
+    "get_allowance",
     {
-      description: "Get the total number of NFTs owned by an address from a specific ERC721 collection",
+      description: "Check the allowance granted to a spender for a token. This tells you how much of a token an address can spend on your behalf.",
       inputSchema: {
-        tokenAddress: z.string().describe("The contract address of the NFT collection"),
-        ownerAddress: z.string().describe("The wallet address to check the NFT balance for"),
+        tokenAddress: z.string().describe("The ERC20 token contract address"),
+        spenderAddress: z.string().describe("The address allowed to spend the token (usually a contract address)"),
+        ownerAddress: z.string().optional().describe("The owner address (defaults to the configured wallet)"),
         network: z.string().optional().describe("Network name or chain ID. Defaults to Ethereum mainnet.")
       },
       annotations: {
-        title: "Get NFT Balance",
+        title: "Get Token Allowance",
         readOnlyHint: true,
         destructiveHint: false,
         idempotentHint: true,
         openWorldHint: true
       }
     },
-    async ({ tokenAddress, ownerAddress, network = "ethereum" }) => {
+    async ({ tokenAddress, spenderAddress, ownerAddress, network = "ethereum" }) => {
       try {
-        const balance = await services.getERC721Balance(tokenAddress as Address, ownerAddress as Address, network);
-        return {
-          content: [{ type: "text", text: JSON.stringify({ collection: tokenAddress, owner: ownerAddress, network, balance: balance.toString() }, null, 2) }]
-        };
-      } catch (error) {
-        return {
-          content: [{ type: "text", text: `Error fetching NFT balance: ${error instanceof Error ? error.message : String(error)}` }],
-          isError: true
-        };
-      }
-    }
-  );
+        const owner = ownerAddress ? (ownerAddress as Address) : getConfiguredWallet().address;
+        const client = await services.getPublicClient(network);
 
-  server.registerTool(
-    "get_erc1155_balance",
-    {
-      description: "Get the balance of a specific ERC1155 token ID owned by an address",
-      inputSchema: {
-        tokenAddress: z.string().describe("The contract address of the ERC1155 token collection"),
-        tokenId: z.string().describe("The ID of the specific token to check"),
-        ownerAddress: z.string().describe("The wallet address to check the token balance for"),
-        network: z.string().optional().describe("Network name or chain ID. Defaults to Ethereum mainnet.")
-      },
-      annotations: {
-        title: "Get ERC1155 Balance",
-        readOnlyHint: true,
-        destructiveHint: false,
-        idempotentHint: true,
-        openWorldHint: true
-      }
-    },
-    async ({ tokenAddress, tokenId, ownerAddress, network = "ethereum" }) => {
-      try {
-        const balance = await services.getERC1155Balance(tokenAddress as Address, ownerAddress as Address, BigInt(tokenId), network);
+        const allowance = await client.readContract({
+          address: tokenAddress as Address,
+          abi: [
+            {
+              name: 'allowance',
+              type: 'function',
+              inputs: [
+                { name: 'owner', type: 'address' },
+                { name: 'spender', type: 'address' }
+              ],
+              outputs: [{ name: '', type: 'uint256' }],
+              stateMutability: 'view'
+            }
+          ],
+          functionName: 'allowance',
+          args: [owner, spenderAddress as Address]
+        });
+
         return {
-          content: [{ type: "text", text: JSON.stringify({ contract: tokenAddress, tokenId, owner: ownerAddress, network, balance: balance.toString() }, null, 2) }]
+          content: [{
+            type: "text",
+            text: JSON.stringify({
+              network,
+              tokenAddress,
+              owner,
+              spenderAddress,
+              allowance: allowance.toString(),
+              message: allowance === 0n ? "No allowance set" : "Allowance is set"
+            }, null, 2)
+          }]
         };
       } catch (error) {
         return {
-          content: [{ type: "text", text: `Error fetching ERC1155 balance: ${error instanceof Error ? error.message : String(error)}` }],
+          content: [{ type: "text", text: `Error fetching allowance: ${error instanceof Error ? error.message : String(error)}` }],
           isError: true
         };
       }
@@ -366,9 +494,9 @@ export function registerEVMTools(server: McpServer) {
   server.registerTool(
     "get_transaction",
     {
-      description: "Get detailed information about a specific transaction by its hash",
+      description: "Get transaction details by transaction hash",
       inputSchema: {
-        txHash: z.string().describe("The transaction hash to look up"),
+        txHash: z.string().describe("Transaction hash (0x...)"),
         network: z.string().optional().describe("Network name or chain ID. Defaults to Ethereum mainnet.")
       },
       annotations: {
@@ -395,9 +523,9 @@ export function registerEVMTools(server: McpServer) {
   server.registerTool(
     "get_transaction_receipt",
     {
-      description: "Get a transaction receipt by its hash",
+      description: "Get transaction receipt (confirmation status, gas used, logs). Use this to check if a transaction has been confirmed.",
       inputSchema: {
-        txHash: z.string().describe("The transaction hash to look up"),
+        txHash: z.string().describe("Transaction hash (0x...)"),
         network: z.string().optional().describe("Network name or chain ID. Defaults to Ethereum mainnet.")
       },
       annotations: {
@@ -410,11 +538,14 @@ export function registerEVMTools(server: McpServer) {
     },
     async ({ txHash, network = "ethereum" }) => {
       try {
-        const receipt = await services.getTransactionReceipt(txHash as Hash, network);
+        const client = await services.getPublicClient(network);
+        const receipt = await client.getTransactionReceipt({
+          hash: txHash as Hash
+        });
         return { content: [{ type: "text", text: services.helpers.formatJson(receipt) }] };
       } catch (error) {
         return {
-          content: [{ type: "text", text: `Error fetching receipt: ${error instanceof Error ? error.message : String(error)}` }],
+          content: [{ type: "text", text: `Error fetching transaction receipt: ${error instanceof Error ? error.message : String(error)}` }],
           isError: true
         };
       }
@@ -422,36 +553,46 @@ export function registerEVMTools(server: McpServer) {
   );
 
   server.registerTool(
-    "estimate_gas",
+    "wait_for_transaction",
     {
-      description: "Estimate the gas cost for a transaction",
+      description: "Wait for a transaction to be confirmed (mined). Polls the network until confirmation.",
       inputSchema: {
-        to: z.string().describe("The recipient address"),
-        value: z.string().optional().describe("The amount of ETH to send in ether (e.g., '0.1')"),
-        data: z.string().optional().describe("The transaction data as a hex string"),
+        txHash: z.string().describe("Transaction hash (0x...)"),
+        confirmations: z.number().optional().describe("Number of block confirmations required. Defaults to 1."),
         network: z.string().optional().describe("Network name or chain ID. Defaults to Ethereum mainnet.")
       },
       annotations: {
-        title: "Estimate Gas",
+        title: "Wait For Transaction",
         readOnlyHint: true,
         destructiveHint: false,
-        idempotentHint: true,
+        idempotentHint: false,
         openWorldHint: true
       }
     },
-    async ({ to, value, data, network = "ethereum" }) => {
+    async ({ txHash, confirmations = 1, network = "ethereum" }) => {
       try {
-        const params: any = { to: to as Address };
-        if (value) params.value = services.helpers.parseEther(value);
-        if (data) params.data = data as `0x${string}`;
+        const client = await services.getPublicClient(network);
+        const receipt = await client.waitForTransactionReceipt({
+          hash: txHash as Hash,
+          confirmations
+        });
 
-        const gas = await services.estimateGas(params, network);
         return {
-          content: [{ type: "text", text: JSON.stringify({ network, estimatedGas: gas.toString() }, null, 2) }]
+          content: [{
+            type: "text",
+            text: JSON.stringify({
+              network,
+              txHash,
+              status: receipt.status === 'success' ? 'confirmed' : 'failed',
+              blockNumber: receipt.blockNumber.toString(),
+              gasUsed: receipt.gasUsed.toString(),
+              confirmations
+            }, null, 2)
+          }]
         };
       } catch (error) {
         return {
-          content: [{ type: "text", text: `Error estimating gas: ${error instanceof Error ? error.message : String(error)}` }],
+          content: [{ type: "text", text: `Error waiting for transaction: ${error instanceof Error ? error.message : String(error)}` }],
           isError: true
         };
       }
@@ -459,47 +600,305 @@ export function registerEVMTools(server: McpServer) {
   );
 
   // ============================================================================
-  // TOKEN INFO TOOLS (Read-only)
+  // SMART CONTRACT TOOLS
   // ============================================================================
 
   server.registerTool(
-    "get_token_info",
+    "get_contract_abi",
     {
-      description: "Get comprehensive information about an ERC20 token including name, symbol, decimals, and total supply",
+      description: "Fetch a contract's ABI from a block explorer (Etherscan, Polygonscan, etc.). Requires ETHERSCAN_API_KEY environment variable.",
       inputSchema: {
-        tokenAddress: z.string().describe("The contract address of the ERC20 token"),
-        network: z.string().optional().describe("Network name or chain ID. Defaults to Ethereum mainnet.")
+        contractAddress: z.string().describe("The contract address (0x...)"),
+        network: z.string().optional().describe("Network name. Defaults to Ethereum mainnet. Supported: ethereum, polygon, arbitrum, optimism, base, avalanche, etc.")
       },
       annotations: {
-        title: "Get Token Info",
+        title: "Get Contract ABI",
         readOnlyHint: true,
         destructiveHint: false,
         idempotentHint: true,
         openWorldHint: true
       }
     },
-    async ({ tokenAddress, network = "ethereum" }) => {
+    async ({ contractAddress, network = "ethereum" }) => {
       try {
-        const tokenInfo = await services.getERC20TokenInfo(tokenAddress as Address, network);
+        const abi = await services.fetchContractABI(contractAddress as Address, network);
+        const parsed = services.parseABI(abi);
+        const readableFunctions = services.getReadableFunctions(parsed);
+
         return {
-          content: [{ type: "text", text: JSON.stringify({ address: tokenAddress, network, ...tokenInfo }, null, 2) }]
+          content: [{
+            type: "text",
+            text: JSON.stringify({
+              contractAddress,
+              network,
+              abiFormat: "json",
+              readableFunctions,
+              totalFunctions: parsed.filter(i => i.type === 'function').length,
+              abi: parsed
+            }, null, 2)
+          }]
         };
       } catch (error) {
         return {
-          content: [{ type: "text", text: `Error fetching token info: ${error instanceof Error ? error.message : String(error)}` }],
+          content: [{ type: "text", text: `Error fetching ABI: ${error instanceof Error ? error.message : String(error)}` }],
           isError: true
         };
       }
     }
   );
+
+  server.registerTool(
+    "read_contract",
+    {
+      description: "Read data from a smart contract (read-only call). Can auto-fetch verified contract ABIs or use common function signatures.",
+      inputSchema: {
+        contractAddress: z.string().describe("The contract address"),
+        functionName: z.string().describe("Function name (e.g., 'name', 'symbol', 'balanceOf', 'totalSupply')"),
+        args: z.array(z.string()).optional().describe("Function arguments as strings"),
+        abiJson: z.string().optional().describe("Full contract ABI as JSON string (optional - will try to auto-fetch if not provided)"),
+        network: z.string().optional().describe("Network name or chain ID. Defaults to Ethereum mainnet.")
+      },
+      annotations: {
+        title: "Read Smart Contract",
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: true
+      }
+    },
+    async ({ contractAddress, functionName, args = [], abiJson, network = "ethereum" }) => {
+      try {
+        const client = await services.getPublicClient(network);
+
+        let abi: any[] | undefined;
+        let functionAbi: any;
+
+        // If ABI is provided, use it
+        if (abiJson) {
+          try {
+            abi = services.parseABI(abiJson);
+            functionAbi = services.getFunctionFromABI(abi, functionName);
+          } catch (error) {
+            return {
+              content: [{
+                type: "text",
+                text: `Error parsing provided ABI: ${error instanceof Error ? error.message : String(error)}`
+              }],
+              isError: true
+            };
+          }
+        } else {
+          // Try to auto-fetch ABI from block explorer
+          try {
+            const fetchedAbi = await services.fetchContractABI(contractAddress as Address, network);
+            abi = services.parseABI(fetchedAbi);
+            functionAbi = services.getFunctionFromABI(abi, functionName);
+          } catch (fetchError) {
+            // Fall back to common function signatures
+            const commonFunctions: { [key: string]: any } = {
+              'name': { inputs: [], outputs: [{ type: 'string' }] },
+              'symbol': { inputs: [], outputs: [{ type: 'string' }] },
+              'decimals': { inputs: [], outputs: [{ type: 'uint8' }] },
+              'totalSupply': { inputs: [], outputs: [{ type: 'uint256' }] },
+              'balanceOf': { inputs: [{ type: 'address' }], outputs: [{ type: 'uint256' }] },
+              'allowance': { inputs: [{ type: 'address' }, { type: 'address' }], outputs: [{ type: 'uint256' }] },
+            };
+
+            if (!commonFunctions[functionName]) {
+              return {
+                content: [{
+                  type: "text",
+                  text: `Error: Could not auto-fetch ABI (${fetchError instanceof Error ? fetchError.message : String(fetchError)}). Function '${functionName}' not in common signatures. Use get_contract_abi to fetch and provide the full ABI, or provide abiJson parameter.`
+                }],
+                isError: true
+              };
+            }
+
+            functionAbi = {
+              name: functionName,
+              type: 'function',
+              inputs: commonFunctions[functionName].inputs,
+              outputs: commonFunctions[functionName].outputs,
+              stateMutability: 'view'
+            };
+          }
+        }
+
+        const result = await client.readContract({
+          address: contractAddress as Address,
+          abi: [functionAbi],
+          functionName: functionName,
+          args: args as any
+        });
+
+        return {
+          content: [{
+            type: "text",
+            text: JSON.stringify({
+              contractAddress,
+              function: functionName,
+              args: args.length > 0 ? args : undefined,
+              result: result?.toString(),
+              abiSource: abiJson ? 'provided' : 'auto-fetched or built-in'
+            }, null, 2)
+          }]
+        };
+      } catch (error) {
+        return {
+          content: [{ type: "text", text: `Error reading contract: ${error instanceof Error ? error.message : String(error)}` }],
+          isError: true
+        };
+      }
+    }
+  );
+
+  // ============================================================================
+  // TRANSFER TOOLS (Write operations)
+  // ============================================================================
+
+  server.registerTool(
+    "transfer_native",
+    {
+      description: "Transfer native tokens (ETH, MATIC, etc.) to an address. Uses the configured wallet.",
+      inputSchema: {
+        to: z.string().describe("Recipient address or ENS name"),
+        amount: z.string().describe("Amount to send in ether (e.g., '0.5' for 0.5 ETH)"),
+        network: z.string().optional().describe("Network name or chain ID. Defaults to Ethereum mainnet.")
+      },
+      annotations: {
+        title: "Transfer Native Tokens",
+        readOnlyHint: false,
+        destructiveHint: true,
+        idempotentHint: false,
+        openWorldHint: true
+      }
+    },
+    async ({ to, amount, network = "ethereum" }) => {
+      try {
+        const wallet = getConfiguredWallet();
+        const txHash = await services.transferETH(wallet, to as Address, amount, network);
+        return {
+          content: [{
+            type: "text",
+            text: JSON.stringify({
+              network,
+              from: wallet.address,
+              to,
+              amount,
+              txHash,
+              message: "Transaction sent. Use get_transaction_receipt to check confirmation."
+            }, null, 2)
+          }]
+        };
+      } catch (error) {
+        return {
+          content: [{ type: "text", text: `Error transferring native tokens: ${error instanceof Error ? error.message : String(error)}` }],
+          isError: true
+        };
+      }
+    }
+  );
+
+  server.registerTool(
+    "transfer_erc20",
+    {
+      description: "Transfer ERC20 tokens to an address. Uses the configured wallet.",
+      inputSchema: {
+        tokenAddress: z.string().describe("The ERC20 token contract address"),
+        to: z.string().describe("Recipient address or ENS name"),
+        amount: z.string().describe("Amount to send (in token units, accounting for decimals)"),
+        network: z.string().optional().describe("Network name or chain ID. Defaults to Ethereum mainnet.")
+      },
+      annotations: {
+        title: "Transfer ERC20 Tokens",
+        readOnlyHint: false,
+        destructiveHint: true,
+        idempotentHint: false,
+        openWorldHint: true
+      }
+    },
+    async ({ tokenAddress, to, amount, network = "ethereum" }) => {
+      try {
+        const wallet = getConfiguredWallet();
+        const txHash = await services.transferERC20(wallet, tokenAddress as Address, to as Address, amount, network);
+        return {
+          content: [{
+            type: "text",
+            text: JSON.stringify({
+              network,
+              tokenAddress,
+              from: wallet.address,
+              to,
+              amount,
+              txHash,
+              message: "Transaction sent. Use get_transaction_receipt to check confirmation."
+            }, null, 2)
+          }]
+        };
+      } catch (error) {
+        return {
+          content: [{ type: "text", text: `Error transferring ERC20 tokens: ${error instanceof Error ? error.message : String(error)}` }],
+          isError: true
+        };
+      }
+    }
+  );
+
+  server.registerTool(
+    "approve_token_spending",
+    {
+      description: "Approve a spender (contract) to spend tokens on your behalf. Required before interacting with DEXes, lending protocols, etc.",
+      inputSchema: {
+        tokenAddress: z.string().describe("The ERC20 token contract address"),
+        spenderAddress: z.string().describe("The address that will be allowed to spend tokens (usually a contract)"),
+        amount: z.string().describe("Amount to approve (in token units). Use '0' to revoke approval."),
+        network: z.string().optional().describe("Network name or chain ID. Defaults to Ethereum mainnet.")
+      },
+      annotations: {
+        title: "Approve Token Spending",
+        readOnlyHint: false,
+        destructiveHint: false,
+        idempotentHint: false,
+        openWorldHint: true
+      }
+    },
+    async ({ tokenAddress, spenderAddress, amount, network = "ethereum" }) => {
+      try {
+        const wallet = getConfiguredWallet();
+        const txHash = await services.approveERC20(wallet, tokenAddress as Address, spenderAddress as Address, amount, network);
+        return {
+          content: [{
+            type: "text",
+            text: JSON.stringify({
+              network,
+              tokenAddress,
+              spender: spenderAddress,
+              approvalAmount: amount,
+              txHash,
+              message: "Approval transaction sent. Use get_transaction_receipt to check confirmation."
+            }, null, 2)
+          }]
+        };
+      } catch (error) {
+        return {
+          content: [{ type: "text", text: `Error approving token spending: ${error instanceof Error ? error.message : String(error)}` }],
+          isError: true
+        };
+      }
+    }
+  );
+
+  // ============================================================================
+  // NFT TOOLS (Read-only)
+  // ============================================================================
 
   server.registerTool(
     "get_nft_info",
     {
-      description: "Get detailed information about a specific NFT (ERC721 token)",
+      description: "Get information about an ERC721 NFT including metadata URI",
       inputSchema: {
-        tokenAddress: z.string().describe("The contract address of the NFT collection"),
-        tokenId: z.string().describe("The ID of the specific NFT token to query"),
+        contractAddress: z.string().describe("The NFT contract address"),
+        tokenId: z.string().describe("The NFT token ID"),
         network: z.string().optional().describe("Network name or chain ID. Defaults to Ethereum mainnet.")
       },
       annotations: {
@@ -510,21 +909,19 @@ export function registerEVMTools(server: McpServer) {
         openWorldHint: true
       }
     },
-    async ({ tokenAddress, tokenId, network = "ethereum" }) => {
+    async ({ contractAddress, tokenId, network = "ethereum" }) => {
       try {
-        const nftInfo = await services.getERC721TokenMetadata(tokenAddress as Address, BigInt(tokenId), network);
-        let owner = null;
-        try {
-          owner = await services.getPublicClient(network).readContract({
-            address: tokenAddress as Address,
-            abi: [{ inputs: [{ type: 'uint256' }], name: 'ownerOf', outputs: [{ type: 'address' }], stateMutability: 'view', type: 'function' }],
-            functionName: 'ownerOf',
-            args: [BigInt(tokenId)]
-          });
-        } catch (e) { /* Ownership info not available */ }
-
+        const nftInfo = await services.getERC721TokenMetadata(contractAddress as Address, BigInt(tokenId), network);
         return {
-          content: [{ type: "text", text: JSON.stringify({ contract: tokenAddress, tokenId, network, ...nftInfo, owner: owner || 'Unknown' }, null, 2) }]
+          content: [{
+            type: "text",
+            text: JSON.stringify({
+              network,
+              contract: contractAddress,
+              tokenId,
+              ...nftInfo
+            }, null, 2)
+          }]
         };
       } catch (error) {
         return {
@@ -536,472 +933,41 @@ export function registerEVMTools(server: McpServer) {
   );
 
   server.registerTool(
-    "get_erc1155_token_uri",
+    "get_erc1155_balance",
     {
-      description: "Get the metadata URI for an ERC1155 token",
+      description: "Get ERC1155 token balance for an address",
       inputSchema: {
-        tokenAddress: z.string().describe("The contract address of the ERC1155 token collection"),
-        tokenId: z.string().describe("The ID of the specific token to query"),
+        contractAddress: z.string().describe("The ERC1155 contract address"),
+        tokenId: z.string().describe("The token ID"),
+        address: z.string().describe("The owner address or ENS name"),
         network: z.string().optional().describe("Network name or chain ID. Defaults to Ethereum mainnet.")
       },
       annotations: {
-        title: "Get ERC1155 Token URI",
+        title: "Get ERC1155 Balance",
         readOnlyHint: true,
         destructiveHint: false,
         idempotentHint: true,
         openWorldHint: true
       }
     },
-    async ({ tokenAddress, tokenId, network = "ethereum" }) => {
+    async ({ contractAddress, tokenId, address, network = "ethereum" }) => {
       try {
-        const uri = await services.getERC1155TokenURI(tokenAddress as Address, BigInt(tokenId), network);
-        return {
-          content: [{ type: "text", text: JSON.stringify({ contract: tokenAddress, tokenId, network, uri }, null, 2) }]
-        };
-      } catch (error) {
-        return {
-          content: [{ type: "text", text: `Error fetching ERC1155 token URI: ${error instanceof Error ? error.message : String(error)}` }],
-          isError: true
-        };
-      }
-    }
-  );
-
-  server.registerTool(
-    "check_nft_ownership",
-    {
-      description: "Check if an address owns a specific NFT",
-      inputSchema: {
-        tokenAddress: z.string().describe("The contract address of the NFT collection"),
-        tokenId: z.string().describe("The ID of the NFT to check"),
-        ownerAddress: z.string().describe("The wallet address to check ownership against"),
-        network: z.string().optional().describe("Network name or chain ID. Defaults to Ethereum mainnet.")
-      },
-      annotations: {
-        title: "Check NFT Ownership",
-        readOnlyHint: true,
-        destructiveHint: false,
-        idempotentHint: true,
-        openWorldHint: true
-      }
-    },
-    async ({ tokenAddress, tokenId, ownerAddress, network = "ethereum" }) => {
-      try {
-        const isOwner = await services.isNFTOwner(tokenAddress, ownerAddress, BigInt(tokenId), network);
+        const balance = await services.getERC1155Balance(contractAddress as Address, address as Address, BigInt(tokenId), network);
         return {
           content: [{
             type: "text",
             text: JSON.stringify({
-              tokenAddress, tokenId, ownerAddress, network, isOwner,
-              result: isOwner ? "Address owns this NFT" : "Address does not own this NFT"
+              network,
+              contract: contractAddress,
+              tokenId,
+              owner: address,
+              balance: balance.toString()
             }, null, 2)
           }]
         };
       } catch (error) {
         return {
-          content: [{ type: "text", text: `Error checking NFT ownership: ${error instanceof Error ? error.message : String(error)}` }],
-          isError: true
-        };
-      }
-    }
-  );
-
-  // ============================================================================
-  // CONTRACT TOOLS (Read-only)
-  // ============================================================================
-
-  server.registerTool(
-    "read_contract",
-    {
-      description: "Read data from a smart contract by calling a view/pure function. This doesn't modify blockchain state.",
-      inputSchema: {
-        contractAddress: z.string().describe("The address of the smart contract"),
-        abi: z.array(z.any()).describe("The ABI of the smart contract function, as a JSON array"),
-        functionName: z.string().describe("The name of the function to call"),
-        args: z.array(z.any()).optional().describe("The arguments to pass to the function"),
-        network: z.string().optional().describe("Network name or chain ID. Defaults to Ethereum mainnet.")
-      },
-      annotations: {
-        title: "Read Contract",
-        readOnlyHint: true,
-        destructiveHint: false,
-        idempotentHint: true,
-        openWorldHint: true
-      }
-    },
-    async ({ contractAddress, abi, functionName, args = [], network = "ethereum" }) => {
-      try {
-        const parsedAbi = typeof abi === 'string' ? JSON.parse(abi) : abi;
-        const params = {
-          address: contractAddress as Address,
-          abi: parsedAbi,
-          functionName: functionName as string,
-          args: args as readonly unknown[]
-        };
-        const result = await services.readContract(params, network as string);
-        return { content: [{ type: "text", text: services.helpers.formatJson(result) }] };
-      } catch (error) {
-        return {
-          content: [{ type: "text", text: `Error reading contract: ${error instanceof Error ? error.message : String(error)}` }],
-          isError: true
-        };
-      }
-    }
-  );
-
-  server.registerTool(
-    "is_contract",
-    {
-      description: "Check if an address is a smart contract or an externally owned account (EOA)",
-      inputSchema: {
-        address: z.string().describe("The address to check"),
-        network: z.string().optional().describe("Network name or chain ID. Defaults to Ethereum mainnet.")
-      },
-      annotations: {
-        title: "Is Contract",
-        readOnlyHint: true,
-        destructiveHint: false,
-        idempotentHint: true,
-        openWorldHint: true
-      }
-    },
-    async ({ address, network = "ethereum" }) => {
-      try {
-        const isContract = await services.isContract(address, network);
-        return {
-          content: [{
-            type: "text",
-            text: JSON.stringify({
-              address, network, isContract,
-              type: isContract ? "Contract" : "Externally Owned Account (EOA)"
-            }, null, 2)
-          }]
-        };
-      } catch (error) {
-        return {
-          content: [{ type: "text", text: `Error checking if address is a contract: ${error instanceof Error ? error.message : String(error)}` }],
-          isError: true
-        };
-      }
-    }
-  );
-
-  // ============================================================================
-  // WALLET TOOLS (Read-only)
-  // ============================================================================
-
-  server.registerTool(
-    "get_address_from_private_key",
-    {
-      description: "Get the EVM address derived from a private key",
-      inputSchema: {
-        privateKey: z.string().describe("Private key in hex format. SECURITY: Used only for address derivation and is not stored.")
-      },
-      annotations: {
-        title: "Get Address from Private Key",
-        readOnlyHint: true,
-        destructiveHint: false,
-        idempotentHint: true,
-        openWorldHint: false
-      }
-    },
-    async ({ privateKey }) => {
-      try {
-        const formattedKey = privateKey.startsWith('0x') ? privateKey as Hex : `0x${privateKey}` as Hex;
-        const address = services.getAddressFromPrivateKey(formattedKey);
-        return {
-          content: [{ type: "text", text: JSON.stringify({ address }, null, 2) }]
-        };
-      } catch (error) {
-        return {
-          content: [{ type: "text", text: `Error deriving address: ${error instanceof Error ? error.message : String(error)}` }],
-          isError: true
-        };
-      }
-    }
-  );
-
-  // ============================================================================
-  // TRANSFER TOOLS (Destructive - modify blockchain state)
-  // ============================================================================
-
-  server.registerTool(
-    "transfer_eth",
-    {
-      description: "Transfer native tokens (ETH, MATIC, etc.) to an address. This modifies blockchain state.",
-      inputSchema: {
-        privateKey: z.string().describe("Private key of the sender. SECURITY: Used only for signing and is not stored."),
-        to: z.string().describe("The recipient address or ENS name"),
-        amount: z.string().describe("Amount to send in ether (e.g., '0.1')"),
-        network: z.string().optional().describe("Network name or chain ID. Defaults to Ethereum mainnet.")
-      },
-      annotations: {
-        title: "Transfer Native Tokens",
-        readOnlyHint: false,
-        destructiveHint: true,
-        idempotentHint: false,
-        openWorldHint: true
-      }
-    },
-    async ({ privateKey, to, amount, network = "ethereum" }) => {
-      try {
-        const txHash = await services.transferETH(privateKey, to, amount, network);
-        return {
-          content: [{ type: "text", text: JSON.stringify({ success: true, txHash, to, amount, network }, null, 2) }]
-        };
-      } catch (error) {
-        return {
-          content: [{ type: "text", text: `Error transferring: ${error instanceof Error ? error.message : String(error)}` }],
-          isError: true
-        };
-      }
-    }
-  );
-
-  server.registerTool(
-    "transfer_erc20",
-    {
-      description: "Transfer ERC20 tokens to another address. This modifies blockchain state.",
-      inputSchema: {
-        privateKey: z.string().describe("Private key of the sender. SECURITY: Used only for signing and is not stored."),
-        tokenAddress: z.string().describe("The ERC20 token contract address"),
-        toAddress: z.string().describe("The recipient address"),
-        amount: z.string().describe("Amount of tokens to send (e.g., '10' for 10 tokens)"),
-        network: z.string().optional().describe("Network name or chain ID. Defaults to Ethereum mainnet.")
-      },
-      annotations: {
-        title: "Transfer ERC20 Tokens",
-        readOnlyHint: false,
-        destructiveHint: true,
-        idempotentHint: false,
-        openWorldHint: true
-      }
-    },
-    async ({ privateKey, tokenAddress, toAddress, amount, network = "ethereum" }) => {
-      try {
-        const formattedKey = privateKey.startsWith('0x') ? privateKey as `0x${string}` : `0x${privateKey}` as `0x${string}`;
-        const result = await services.transferERC20(tokenAddress as Address, toAddress as Address, amount, formattedKey, network);
-        return {
-          content: [{
-            type: "text",
-            text: JSON.stringify({
-              success: true, txHash: result.txHash, network, tokenAddress,
-              recipient: toAddress, amount: result.amount.formatted, symbol: result.token.symbol
-            }, null, 2)
-          }]
-        };
-      } catch (error) {
-        return {
-          content: [{ type: "text", text: `Error transferring ERC20: ${error instanceof Error ? error.message : String(error)}` }],
-          isError: true
-        };
-      }
-    }
-  );
-
-  server.registerTool(
-    "transfer_token",
-    {
-      description: "Transfer ERC20 tokens to an address (alias for transfer_erc20)",
-      inputSchema: {
-        privateKey: z.string().describe("Private key of the sender. SECURITY: Used only for signing."),
-        tokenAddress: z.string().describe("The ERC20 token contract address"),
-        toAddress: z.string().describe("The recipient address or ENS name"),
-        amount: z.string().describe("Amount of tokens to send"),
-        network: z.string().optional().describe("Network name or chain ID. Defaults to Ethereum mainnet.")
-      },
-      annotations: {
-        title: "Transfer Token",
-        readOnlyHint: false,
-        destructiveHint: true,
-        idempotentHint: false,
-        openWorldHint: true
-      }
-    },
-    async ({ privateKey, tokenAddress, toAddress, amount, network = "ethereum" }) => {
-      try {
-        const result = await services.transferERC20(tokenAddress, toAddress, amount, privateKey, network);
-        return {
-          content: [{
-            type: "text",
-            text: JSON.stringify({
-              success: true, txHash: result.txHash, tokenAddress, toAddress,
-              amount: result.amount.formatted, symbol: result.token.symbol, network
-            }, null, 2)
-          }]
-        };
-      } catch (error) {
-        return {
-          content: [{ type: "text", text: `Error transferring tokens: ${error instanceof Error ? error.message : String(error)}` }],
-          isError: true
-        };
-      }
-    }
-  );
-
-  server.registerTool(
-    "transfer_nft",
-    {
-      description: "Transfer an NFT (ERC721 token) to another address. This modifies blockchain state.",
-      inputSchema: {
-        privateKey: z.string().describe("Private key of the NFT owner. SECURITY: Used only for signing."),
-        tokenAddress: z.string().describe("The NFT collection contract address"),
-        tokenId: z.string().describe("The ID of the NFT to transfer"),
-        toAddress: z.string().describe("The recipient address"),
-        network: z.string().optional().describe("Network name or chain ID. Defaults to Ethereum mainnet.")
-      },
-      annotations: {
-        title: "Transfer NFT",
-        readOnlyHint: false,
-        destructiveHint: true,
-        idempotentHint: false,
-        openWorldHint: true
-      }
-    },
-    async ({ privateKey, tokenAddress, tokenId, toAddress, network = "ethereum" }) => {
-      try {
-        const formattedKey = privateKey.startsWith('0x') ? privateKey as `0x${string}` : `0x${privateKey}` as `0x${string}`;
-        const result = await services.transferERC721(tokenAddress as Address, toAddress as Address, BigInt(tokenId), formattedKey, network);
-        return {
-          content: [{
-            type: "text",
-            text: JSON.stringify({
-              success: true, txHash: result.txHash, network, collection: tokenAddress,
-              tokenId: result.tokenId, recipient: toAddress, name: result.token.name, symbol: result.token.symbol
-            }, null, 2)
-          }]
-        };
-      } catch (error) {
-        return {
-          content: [{ type: "text", text: `Error transferring NFT: ${error instanceof Error ? error.message : String(error)}` }],
-          isError: true
-        };
-      }
-    }
-  );
-
-  server.registerTool(
-    "transfer_erc1155",
-    {
-      description: "Transfer ERC1155 tokens to another address. This modifies blockchain state.",
-      inputSchema: {
-        privateKey: z.string().describe("Private key of the token owner. SECURITY: Used only for signing."),
-        tokenAddress: z.string().describe("The ERC1155 token collection contract address"),
-        tokenId: z.string().describe("The ID of the token to transfer"),
-        amount: z.string().describe("The quantity of tokens to send"),
-        toAddress: z.string().describe("The recipient address"),
-        network: z.string().optional().describe("Network name or chain ID. Defaults to Ethereum mainnet.")
-      },
-      annotations: {
-        title: "Transfer ERC1155 Tokens",
-        readOnlyHint: false,
-        destructiveHint: true,
-        idempotentHint: false,
-        openWorldHint: true
-      }
-    },
-    async ({ privateKey, tokenAddress, tokenId, amount, toAddress, network = "ethereum" }) => {
-      try {
-        const formattedKey = privateKey.startsWith('0x') ? privateKey as `0x${string}` : `0x${privateKey}` as `0x${string}`;
-        const result = await services.transferERC1155(tokenAddress as Address, toAddress as Address, BigInt(tokenId), amount, formattedKey, network);
-        return {
-          content: [{
-            type: "text",
-            text: JSON.stringify({
-              success: true, txHash: result.txHash, network, contract: tokenAddress,
-              tokenId: result.tokenId, amount: result.amount, recipient: toAddress
-            }, null, 2)
-          }]
-        };
-      } catch (error) {
-        return {
-          content: [{ type: "text", text: `Error transferring ERC1155: ${error instanceof Error ? error.message : String(error)}` }],
-          isError: true
-        };
-      }
-    }
-  );
-
-  server.registerTool(
-    "approve_token_spending",
-    {
-      description: "Approve another address to spend your ERC20 tokens. This modifies blockchain state.",
-      inputSchema: {
-        privateKey: z.string().describe("Private key of the token owner. SECURITY: Used only for signing."),
-        tokenAddress: z.string().describe("The ERC20 token contract address"),
-        spenderAddress: z.string().describe("The address being approved to spend tokens"),
-        amount: z.string().describe("The amount of tokens to approve"),
-        network: z.string().optional().describe("Network name or chain ID. Defaults to Ethereum mainnet.")
-      },
-      annotations: {
-        title: "Approve Token Spending",
-        readOnlyHint: false,
-        destructiveHint: true,
-        idempotentHint: true,
-        openWorldHint: true
-      }
-    },
-    async ({ privateKey, tokenAddress, spenderAddress, amount, network = "ethereum" }) => {
-      try {
-        const formattedKey = privateKey.startsWith('0x') ? privateKey as `0x${string}` : `0x${privateKey}` as `0x${string}`;
-        const result = await services.approveERC20(tokenAddress as Address, spenderAddress as Address, amount, formattedKey, network);
-        return {
-          content: [{
-            type: "text",
-            text: JSON.stringify({
-              success: true, txHash: result.txHash, network, tokenAddress,
-              spender: spenderAddress, amount: result.amount.formatted, symbol: result.token.symbol
-            }, null, 2)
-          }]
-        };
-      } catch (error) {
-        return {
-          content: [{ type: "text", text: `Error approving: ${error instanceof Error ? error.message : String(error)}` }],
-          isError: true
-        };
-      }
-    }
-  );
-
-  server.registerTool(
-    "write_contract",
-    {
-      description: "Write data to a smart contract by calling a state-changing function. This modifies blockchain state.",
-      inputSchema: {
-        contractAddress: z.string().describe("The smart contract address"),
-        abi: z.array(z.any()).describe("The ABI of the function, as a JSON array"),
-        functionName: z.string().describe("The name of the function to call"),
-        args: z.array(z.any()).describe("The arguments to pass to the function"),
-        privateKey: z.string().describe("Private key of the sender. SECURITY: Used only for signing."),
-        network: z.string().optional().describe("Network name or chain ID. Defaults to Ethereum mainnet.")
-      },
-      annotations: {
-        title: "Write to Smart Contract",
-        readOnlyHint: false,
-        destructiveHint: true,
-        idempotentHint: false,
-        openWorldHint: true
-      }
-    },
-    async ({ contractAddress, abi, functionName, args, privateKey, network = "ethereum" }) => {
-      try {
-        const parsedAbi = typeof abi === 'string' ? JSON.parse(abi) : abi;
-        const contractParams: Record<string, any> = {
-          address: contractAddress as Address,
-          abi: parsedAbi,
-          functionName,
-          args
-        };
-        const txHash = await services.writeContract(privateKey as Hex, contractParams, network);
-        return {
-          content: [{
-            type: "text",
-            text: JSON.stringify({ network, transactionHash: txHash, message: "Contract write transaction sent successfully" }, null, 2)
-          }]
-        };
-      } catch (error) {
-        return {
-          content: [{ type: "text", text: `Error writing to contract: ${error instanceof Error ? error.message : String(error)}` }],
+          content: [{ type: "text", text: `Error fetching ERC1155 balance: ${error instanceof Error ? error.message : String(error)}` }],
           isError: true
         };
       }
