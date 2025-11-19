@@ -4,27 +4,32 @@ import { z } from "zod";
 /**
  * Register task-oriented prompts with the MCP server
  *
- * Prompts function like macros - they guide the model through complex multi-step workflows.
- * Instead of the AI agent having to discover and call multiple tools in the right sequence,
- * these prompts provide a structured approach to common blockchain tasks.
+ * All prompts follow a consistent structure:
+ * - Clear objective statement
+ * - Step-by-step instructions
+ * - Expected outputs
+ * - Safety/security considerations
+ *
+ * Prompts guide the model through complex workflows that would otherwise
+ * require multiple tool calls in the correct sequence.
  *
  * @param server The MCP server instance
  */
 export function registerEVMPrompts(server: McpServer) {
   // ============================================================================
-  // TRANSACTION PREPARATION PROMPTS
+  // TRANSACTION PROMPTS
   // ============================================================================
 
   server.registerPrompt(
     "prepare_transfer",
     {
-      description: "Guide through preparing a token transfer with safety checks",
+      description: "Safely prepare and execute a token transfer with validation checks",
       argsSchema: {
-        tokenType: z.enum(["native", "erc20"]).describe("Type of token: 'native' for ETH/MATIC, 'erc20' for contract tokens"),
+        tokenType: z.enum(["native", "erc20"]).describe("Token type: 'native' for ETH/MATIC or 'erc20' for contract tokens"),
         recipient: z.string().describe("Recipient address or ENS name"),
-        amount: z.string().describe("Amount to transfer"),
-        network: z.string().optional().describe("Network name (e.g., 'ethereum', 'polygon'). Defaults to Ethereum mainnet."),
-        tokenAddress: z.string().optional().describe("Token contract address (required for ERC20 transfers)")
+        amount: z.string().describe("Amount to transfer (in ether for native, token units for ERC20)"),
+        network: z.string().optional().describe("Network name (default: ethereum)"),
+        tokenAddress: z.string().optional().describe("Token contract address (required for ERC20)")
       }
     },
     ({ tokenType, recipient, amount, network = "ethereum", tokenAddress }) => ({
@@ -32,31 +37,49 @@ export function registerEVMPrompts(server: McpServer) {
         role: "user",
         content: {
           type: "text",
-          text: tokenType === "native"
-            ? `I want to transfer ${amount} native tokens (${network === "ethereum" ? "ETH" : "MATIC"}) to ${recipient} on ${network}.
+          text: `# Token Transfer Task
 
-Before proceeding:
-1. Call get_wallet_address to confirm which wallet will send the transaction
-2. Call get_balance to verify I have enough balance
-3. Call get_gas_price to understand current gas costs
-4. Summarize the transaction details and ask for confirmation before executing
-5. Call transfer_native once approved
-6. Wait for confirmation with wait_for_transaction
+**Objective**: Safely transfer ${amount} ${tokenType === "native" ? "native tokens" : "ERC20 tokens"} to ${recipient} on ${network}
 
-Be clear about gas costs and the impact of this transaction.`
-            : `I want to transfer ${amount} tokens (contract: ${tokenAddress}) to ${recipient} on ${network}.
+## Validation & Checks
+Before executing any transfer:
+1. **Wallet Verification**: Call \`get_wallet_address\` to confirm the sending wallet
+2. **Balance Check**:
+   ${tokenType === "native"
+     ? "- Call `get_balance` to verify native token balance"
+     : "- Call `get_token_balance` with tokenAddress=${tokenAddress} to verify balance"}
+3. **Gas Analysis**: Call \`get_gas_price\` to assess current network costs
+${tokenType === "erc20" ? `4. **Approval Check**: Call \`get_allowance\` to verify approval (if needed for protocols)` : ""}
 
-Before proceeding:
-1. Call get_wallet_address to confirm which wallet will send the transaction
-2. Call get_token_balance to verify I have enough balance
-3. Call get_gas_price to understand current gas costs
-4. Check if an approval is needed (call get_allowance for your DEX/protocol)
-5. Summarize the transaction details and ask for confirmation before executing
-6. If approval needed, call approve_token_spending first
-7. Call transfer_erc20 once approved
-8. Wait for confirmation with wait_for_transaction
+## Execution Steps
+${tokenType === "native" ? `
+1. Summarize: sender address, recipient, amount, and estimated gas cost
+2. Request confirmation from user
+3. Call \`transfer_native\` with to="${recipient}", amount="${amount}", network="${network}"
+4. Return transaction hash to user
+5. Call \`wait_for_transaction\` to confirm completion
+` : `
+1. Check if approval is needed:
+   - If allowance < amount: Call \`approve_token_spending\` first
+   - Then proceed with transfer
+2. Summarize: sender, recipient, token, amount, decimals, gas estimate
+3. Request confirmation
+4. Call \`transfer_erc20\` with tokenAddress, recipient, amount
+5. Wait for confirmation with \`wait_for_transaction\`
+`}
 
-Be clear about gas costs, token decimals, and the impact of this transaction.`
+## Output Format
+- **Transaction Hash**: Clear hex value
+- **Status**: Pending or Confirmed
+- **Cost Estimate**: Gas price and total cost
+- **User Confirmation**: Always ask before sending
+
+## Safety Considerations
+- Never send more than available balance
+- Double-check recipient address
+- Warn about high gas prices
+- Explain any approval requirements
+`
         }
       }]
     })
@@ -65,10 +88,10 @@ Be clear about gas costs, token decimals, and the impact of this transaction.`
   server.registerPrompt(
     "diagnose_transaction",
     {
-      description: "Analyze a failed or pending transaction and suggest solutions",
+      description: "Analyze transaction status, failures, and provide debugging insights",
       argsSchema: {
-        txHash: z.string().describe("Transaction hash (0x...)"),
-        network: z.string().optional().describe("Network name. Defaults to Ethereum mainnet.")
+        txHash: z.string().describe("Transaction hash to diagnose (0x...)"),
+        network: z.string().optional().describe("Network name (default: ethereum)")
       }
     },
     ({ txHash, network = "ethereum" }) => ({
@@ -76,23 +99,67 @@ Be clear about gas costs, token decimals, and the impact of this transaction.`
         role: "user",
         content: {
           type: "text",
-          text: `Please diagnose this transaction: ${txHash} on ${network}
+          text: `# Transaction Diagnosis
 
-Follow these steps:
-1. Call get_transaction to get the transaction details
-2. Call get_transaction_receipt to check the status and gas used
-3. Analyze what went wrong or what the transaction is doing
-4. If it failed:
-   - Check if it was out of gas
-   - Check if it was a contract revert
-   - Look at the gas limit vs gas used
-5. Provide:
-   - Current status (pending/confirmed/failed)
-   - Why it failed (if applicable)
-   - Gas analysis
-   - Recommended next steps
+**Objective**: Analyze transaction ${txHash} on ${network} and identify any issues
 
-Be specific about the issues and provide actionable solutions.`
+## Investigation Process
+
+### 1. Gather Transaction Data
+- Call \`get_transaction\` to fetch transaction details
+- Call \`get_transaction_receipt\` to get status and gas used
+- Note: both calls are read-only and free
+
+### 2. Status Assessment
+Determine transaction state:
+- **Pending**: Not yet mined (check mempool conditions)
+- **Confirmed**: Successfully executed (status='success')
+- **Failed**: Execution failed (status='failed')
+- **Replaced**: Transaction was dropped/replaced (check nonce)
+
+### 3. Failure Analysis
+If transaction failed, investigate:
+
+**Out of Gas**:
+- Compare gasUsed vs gasLimit in receipt
+- If gasUsed >= gasLimit, suggest increasing gas limit
+
+**Contract Revert**:
+- Check function called and parameters
+- Verify sufficient balance/approvals
+- Look for require/revert statements in contract
+
+**Invalid Nonce**:
+- Compare transaction nonce with account's current nonce
+- Suggest pending transactions may need replacement
+
+**Other Issues**:
+- Check sender/recipient addresses are valid
+- Verify function parameters are correct type
+- Look for access control restrictions
+
+### 4. Gas Analysis
+- Calculate gas cost: gasUsed * gasPrice
+- Compare to current gas prices (call \`get_gas_price\`)
+- Assess if overpaid or underpaid
+
+## Output Format
+
+Provide structured diagnosis:
+- **Status**: Pending/Confirmed/Failed with reason
+- **Transaction Hash**: The hash analyzed
+- **From/To**: Addresses involved
+- **Function**: What was called
+- **Gas Analysis**: Used vs limit, cost
+- **Issue (if failed)**: Root cause and explanation
+- **Recommended Actions**: Next steps to resolve
+
+## Important Notes
+- Be specific about error messages and codes
+- Provide actionable recommendations
+- Link issues to specific contract behavior
+- Suggest solutions (retry, increase gas, fix parameters, etc.)
+`
         }
       }]
     })
@@ -105,34 +172,76 @@ Be specific about the issues and provide actionable solutions.`
   server.registerPrompt(
     "analyze_wallet",
     {
-      description: "Get a comprehensive overview of a wallet's assets and activity",
+      description: "Get comprehensive overview of wallet assets, balances, and activity",
       argsSchema: {
         address: z.string().describe("Wallet address or ENS name to analyze"),
-        network: z.string().optional().describe("Network name. Defaults to Ethereum mainnet."),
-        tokens: z.string().optional().describe("Comma-separated list of ERC20 token addresses to check balance for")
+        network: z.string().optional().describe("Network name (default: ethereum)"),
+        tokens: z.string().optional().describe("Comma-separated token addresses to check")
       }
     },
     ({ address, network = "ethereum", tokens }) => {
       const tokenList = tokens ? tokens.split(',').map(t => t.trim()) : [];
       return {
-      messages: [{
-        role: "user",
-        content: {
-          type: "text",
-          text: `Please analyze the wallet ${address} on ${network}:
+        messages: [{
+          role: "user",
+          content: {
+            type: "text",
+            text: `# Wallet Analysis
 
-1. Call resolve_ens_name if the input looks like an ENS name, otherwise use it as an address
-2. Call get_balance to get the native token balance
-3. If tokens are specified, call get_token_balance for each token to show holdings
-4. Provide a summary with:
-   - Wallet address and ENS name (if any)
-   - Native token balance (in both wei and ether)
-   - Token holdings (if checked)
-   - Overall asset overview
+**Objective**: Provide complete asset overview for ${address} on ${network}
 
-Format the results in a clear, readable way. If the wallet has no balance, let the user know.`
-        }
-      }]
+## Information Gathering
+
+### 1. Address Resolution
+- If input contains '.eth', call \`resolve_ens_name\` to get address
+- Otherwise use as direct address
+- Provide both resolved address and ENS name if applicable
+
+### 2. Native Token Balance
+- Call \`get_balance\` to fetch native token (ETH/MATIC/etc) balance
+- Report both wei and ether/human-readable formats
+- Note: Free read-only call
+
+### 3. Token Balances
+${tokenList.length > 0
+  ? `- Call \`get_token_balance\` for each token:\n${tokenList.map(t => `  * ${t}`).join('\n')}`
+  : `- If specific tokens provided: call \`get_token_balance\` for each
+- Include token symbol and decimals if available`}
+
+## Output Format
+
+Provide analysis with clear sections:
+
+**Wallet Overview**
+- Address: [address]
+- ENS Name: [name or none]
+- Network: [network]
+
+**Native Token Balance**
+- Ether: [formatted amount]
+- Wei: [raw amount]
+- In USD (if price available): [estimated value]
+
+**Token Holdings** (if requested)
+- Token: [address]
+- Symbol: [symbol]
+- Balance: [formatted]
+- Decimals: [decimals]
+
+**Summary**
+- Total assets value (if prices available)
+- Primary holdings
+- Notable observations
+
+## Key Considerations
+- Show both formatted and raw amounts
+- Include token decimals for precision
+- Note if wallet has low/no balance
+- Highlight any unusual patterns
+- Be clear about what data was available vs not
+`
+          }
+        }]
       };
     }
   );
@@ -140,11 +249,11 @@ Format the results in a clear, readable way. If the wallet has no balance, let t
   server.registerPrompt(
     "audit_approvals",
     {
-      description: "Review token approvals for a wallet and identify security risks",
+      description: "Review token approvals and identify security risks from unlimited spend",
       argsSchema: {
-        address: z.string().optional().describe("Wallet address to audit (defaults to configured wallet)"),
-        tokenAddress: z.string().describe("ERC20 token contract address to check approvals for"),
-        network: z.string().optional().describe("Network name. Defaults to Ethereum mainnet.")
+        address: z.string().optional().describe("Wallet to audit (default: configured wallet)"),
+        tokenAddress: z.string().describe("Token contract address to check approvals for"),
+        network: z.string().optional().describe("Network name (default: ethereum)")
       }
     },
     ({ address, tokenAddress, network = "ethereum" }) => ({
@@ -152,70 +261,318 @@ Format the results in a clear, readable way. If the wallet has no balance, let t
         role: "user",
         content: {
           type: "text",
-          text: `Please audit token approvals for ${tokenAddress} on ${network}${address ? ` for address ${address}` : " for the configured wallet"}:
+          text: `# Token Approval Audit
 
-1. If no address is provided, call get_wallet_address to get the configured wallet
-2. Call get_allowance to check if there are any existing approvals
-3. Analyze the approval amount and what it means:
-   - If allowance is 0: No approval set
-   - If allowance is a normal amount: Limited approval (safe)
-   - If allowance is max uint256: Unlimited approval (security risk)
-4. Provide recommendations:
-   - Is the current approval appropriate?
-   - Should any dangerous approvals be revoked?
-   - What approvals should be set up before interacting with protocols?
+**Objective**: Check and analyze token approvals to identify security risks
 
-Be clear about the security implications of unlimited approvals.`
+## Approval Analysis
+
+### 1. Get Configured Wallet (if needed)
+- If no address provided: call \`get_wallet_address\` to get the configured wallet
+- Use that as the owner for approval checks
+
+### 2. Check Current Approvals
+- Call \`get_allowance\` with:
+  * tokenAddress: ${tokenAddress}
+  * ownerAddress: [wallet address from step 1]
+  * spenderAddress: [contract being analyzed]
+- Note the allowance amount returned
+
+### 3. Interpret Results
+
+**Allowance = 0**
+- No approval set
+- User must approve before spender can use tokens
+- Safe state
+
+**Allowance < Max Value**
+- Limited approval (safest approach)
+- Spender can only use up to this amount
+- Tokens are protected
+
+**Allowance = Max uint256 (unlimited)**
+- Dangerous! Spender has unlimited access
+- Common but risky pattern
+- Should be revoked if not actively used
+
+## Security Assessment
+
+For each approval found:
+1. **Risk Level**: Low/Medium/High based on:
+   - Is it unlimited (high risk)?
+   - How trusted is the spender?
+   - Is it actively used?
+
+2. **Recommendations**:
+   - Revoke unknown/untrusted spenders
+   - Lower limits on high-risk approvals
+   - Keep active approvals but monitor
+   - Remove expired/legacy approvals
+
+## Output Format
+
+**Token Approval Audit Report**
+
+For each spender:
+- **Spender Address**: [contract address]
+- **Current Allowance**: [amount or "Unlimited"]
+- **Risk Level**: Low/Medium/High
+- **Status**: Active/Unused
+- **Recommendation**: Keep/Reduce/Revoke
+
+**Summary**
+- Total dangerous approvals: [count]
+- Recommendations: [action items]
+- Overall risk: Safe/Moderate/High
+
+## Important Notes
+- Unlimited approvals are a major attack vector
+- Only approve what's necessary
+- Regularly audit and revoke unused approvals
+- Be especially careful with new/unknown contracts
+`
         }
       }]
     })
   );
 
   // ============================================================================
-  // SMART CONTRACT EXPLORATION PROMPTS
+  // SMART CONTRACT ANALYSIS PROMPTS
   // ============================================================================
 
   server.registerPrompt(
-    "explore_contract",
+    "fetch_and_analyze_abi",
     {
-      description: "Analyze a smart contract to understand its functions and state",
+      description: "Fetch contract ABI from block explorer and provide comprehensive analysis",
       argsSchema: {
-        contractAddress: z.string().describe("The contract address to explore"),
-        network: z.string().optional().describe("Network name. Defaults to Ethereum mainnet.")
+        contractAddress: z.string().describe("Contract address to analyze"),
+        network: z.string().optional().describe("Network name (default: ethereum)"),
+        findFunction: z.string().optional().describe("Specific function to analyze (e.g., 'swap', 'mint')")
       }
     },
-    ({ contractAddress, network = "ethereum" }) => ({
+    ({ contractAddress, network = "ethereum", findFunction }) => ({
       messages: [{
         role: "user",
         content: {
           type: "text",
-          text: `Please explore the smart contract at ${contractAddress} on ${network}:
+          text: `# ABI Fetch and Analysis
 
-1. This is a read-only exploration - no transactions will be executed
-2. Identify what type of contract this is (token, NFT, DEX, lending, etc.)
-3. Try to read common functions that might exist:
-   - For tokens: name(), symbol(), decimals(), totalSupply()
-   - For NFTs: name(), symbol(), totalSupply()
-   - For other contracts: relevant state functions
-4. Use read_contract to call these functions
-5. Provide a summary with:
-   - Contract type and purpose (best guess)
-   - Key properties discovered
-   - Security notes (if applicable)
-   - Next steps for interacting with it
+**Objective**: Retrieve and analyze contract ABI from block explorer
 
-Be clear about what you were able to discover and what remains unknown.`
+## Prerequisites
+- Contract must be verified on block explorer (Etherscan/Polygonscan/etc)
+- ETHERSCAN_API_KEY environment variable required
+- Supports 30+ EVM networks via unified Etherscan v2 API
+- Read-only, no gas cost
+
+## Fetching Process
+
+### 1. Fetch the ABI
+- Call \`get_contract_abi\` with contractAddress="${contractAddress}", network="${network}"
+- Returns full ABI array with all functions, events, state variables
+- Includes metadata about each function (inputs, outputs, mutability)
+
+### 2. Parse and Categorize
+Organize functions by type:
+
+**View/Pure Functions** (Read-only, free):
+- Check current state
+- Query data without state change
+- Safe to call
+
+**State-Changing Functions**:
+- Payable: require ETH value
+- Nonpayable: modify contract state
+- Cost gas, need signer
+
+**Admin Functions**:
+- Often restricted (onlyOwner, etc)
+- Control contract behavior
+- High risk if compromised
+
+### 3. Analyze Structure
+- Count functions by type
+- Identify events and their usage
+- Look for special functions (constructor, fallback, receive)
+- Check for custom errors
+
+${findFunction ? `### 4. Find Specific Function
+- Search for "${findFunction}" in ABI
+- Document: inputs, outputs, mutability
+- Explain what it does
+- Note any access controls` : `### 4. Key Functions
+- Identify most important/used functions
+- Explain inputs and outputs
+- Note special requirements`}
+
+## Function Analysis Format
+
+For important functions provide:
+- **Name**: Function name
+- **Type**: View/Pure/Payable/Nonpayable
+- **Inputs**: Parameter names and types with descriptions
+- **Outputs**: Return values and types
+- **Access**: Public/External/Restricted
+- **Purpose**: What it does
+- **Usage**: How to call it
+
+## Security Analysis
+
+Look for:
+- **Proxy Patterns**: Is this a proxy contract?
+- **Access Controls**: Who can call what?
+- **Special Functions**: Initialization, upgrade paths
+- **Obvious Issues**: Reentrancy risks, overflow/underflow patterns
+- **Standard Compliance**: Is it ERC20/721/1155 compatible?
+
+## Output Format
+
+**Contract Analysis Report**
+
+- **Contract Type**: Identified purpose (Token/DEX/Lending/etc)
+- **Network**: Where deployed
+- **Verified**: Yes (since we fetched ABI)
+- **Function Count**: Total functions by type
+
+**Function Categories**:
+- View/Pure: [list of read functions]
+- Write: [list of state-changing functions]
+- Admin: [restricted functions]
+
+**Key Functions**:
+[Detailed analysis of important functions]
+
+**Security Notes**:
+[Vulnerabilities, patterns, recommendations]
+
+**How to Interact**:
+[Step-by-step guide for common operations]
+`
         }
       }]
     })
   );
 
   server.registerPrompt(
+    "explore_contract",
+    {
+      description: "Analyze contract functions and state without requiring full ABI",
+      argsSchema: {
+        contractAddress: z.string().describe("Contract address to explore"),
+        network: z.string().optional().describe("Network name (default: ethereum)"),
+        fetchAbi: z.string().optional().describe("Set to 'true' to auto-fetch ABI (requires ETHERSCAN_API_KEY)")
+      }
+    },
+    ({ contractAddress, network = "ethereum", fetchAbi }) => ({
+      messages: [{
+        role: "user",
+        content: {
+          type: "text",
+          text: `# Contract Exploration
+
+**Objective**: Understand what contract ${contractAddress} does and how to use it
+
+## Exploration Strategy
+
+${fetchAbi === 'true'
+  ? `### With Full ABI (Fetched)
+1. Call \`get_contract_abi\` to fetch verified ABI
+2. Parse all available functions
+3. Call \`read_contract\` for important state functions
+4. Build comprehensive understanding
+`
+  : `### Without Full ABI (Probing)
+1. Test common function signatures
+2. Call \`read_contract\` with standard functions:
+   - name(), symbol(), decimals(), totalSupply()
+   - owner(), paused(), version()
+   - balanceOf(), allowance(), totalSupply()
+3. Infer contract type from successful calls
+`}
+
+## Detection Process
+
+### 1. Identify Contract Type
+Based on available functions, determine:
+- **Token**: Has name, symbol, decimals, totalSupply, balanceOf
+- **NFT/ERC721**: Has tokenURI, ownerOf, name, symbol
+- **NFT/ERC1155**: Has uri, balanceOf, balanceOfBatch
+- **Staking**: Has stake, unstake, reward, claim functions
+- **DEX**: Has swap, liquidity, pair functions
+- **Other**: Analyze unique functions
+
+### 2. Gather Key Information
+
+For each contract type:
+
+**Token (ERC20)**:
+- name, symbol, decimals, totalSupply
+- If owner, supply cap, minting rules
+- If tax/fee mechanism
+
+**NFT (ERC721)**:
+- name, symbol, totalSupply
+- baseURI, tokenURI patterns
+- royalty info if available
+
+**Staking/Farming**:
+- Pool info, APY, reward token
+- Lockup periods, early withdrawal penalties
+- Reward distribution mechanism
+
+### 3. Security Assessment
+- Check for pause functions (risk of rug)
+- Look for upgrade mechanisms (upgradeable proxy)
+- Identify admin-only functions
+- Note unusual patterns
+
+## Output Format
+
+**Contract Overview**
+- Address: [address]
+- Type: [identified type]
+- Network: [network]
+- Verified: [yes/if ABI was fetched]
+
+**Key Properties**
+[Type-specific details discovered]
+
+**Available Functions**
+- Read-only: [list]
+- State-changing: [list]
+- Admin: [list if any]
+
+**How to Use**
+[Step-by-step guide for primary use case]
+
+**Security Notes**
+[Observations and recommendations]
+
+**Limitations**
+[What couldn't be determined without full ABI]
+
+## When to Use ABI Fetch
+- Need complete function list
+- Want detailed parameter information
+- Exploring unfamiliar/complex contracts
+- Security due diligence
+- Learn contract architecture
+`
+        }
+      }]
+    })
+  );
+
+  // ============================================================================
+  // NETWORK & EDUCATION PROMPTS
+  // ============================================================================
+
+  server.registerPrompt(
     "explain_evm_concept",
     {
-      description: "Get an explanation of an EVM or blockchain concept",
+      description: "Explain EVM and blockchain concepts with examples",
       argsSchema: {
-        concept: z.string().describe("The concept to explain (e.g., 'gas', 'nonce', 'smart contracts', 'MEV')")
+        concept: z.string().describe("Concept to explain (gas, nonce, smart contracts, MEV, etc)")
       }
     },
     ({ concept }) => ({
@@ -223,60 +580,193 @@ Be clear about what you were able to discover and what remains unknown.`
         role: "user",
         content: {
           type: "text",
-          text: `Please explain the blockchain/EVM concept: "${concept}"
+          text: `# Concept Explanation: ${concept}
 
-In your explanation:
-1. Define what it is in simple terms
-2. Explain why it matters
-3. Give practical examples
-4. Explain how it affects using blockchain applications
-5. If relevant, mention how to check or monitor it on the blockchain
+**Objective**: Provide clear, practical explanation of "${concept}"
 
-Make it accessible for someone new to blockchain but interested in using EVM networks.`
+## Explanation Structure
+
+### 1. Definition
+- What is it?
+- Simple one-sentence summary
+- Technical name/terminology
+
+### 2. How It Works
+- Step-by-step explanation
+- Why it exists/why it's important
+- How it relates to blockchain
+
+### 3. Real-World Analogy
+- Compare to familiar concept
+- Make it relatable for beginners
+- Highlight key differences
+
+### 4. Practical Examples
+- Real transaction examples
+- Numbers and metrics where applicable
+- Common scenarios
+- Edge cases or gotchas
+
+### 5. Relevance to Users
+- Why should developers care?
+- How does it affect transactions?
+- How to optimize/reduce costs?
+- Common mistakes to avoid
+
+## Output Format
+
+Provide explanation in sections:
+
+**What is ${concept}?**
+[Definition and overview]
+
+**How Does It Work?**
+[Mechanics and process]
+
+**Example**
+[Real or hypothetical scenario]
+
+**Key Takeaways**
+[Bullet points of important facts]
+
+**Common Questions**
+- Question 1? Answer
+- Question 2? Answer
+
+## Important
+- Use clear, non-technical language first
+- Progress to technical details
+- Include concrete numbers where helpful
+- Be honest about complexity
+- Suggest further learning if needed
+`
         }
       }]
     })
   );
 
-  // ============================================================================
-  // NETWORK INFORMATION PROMPTS
-  // ============================================================================
-
   server.registerPrompt(
     "compare_networks",
     {
-      description: "Compare different EVM networks to understand their differences",
+      description: "Compare multiple EVM networks on key metrics and characteristics",
       argsSchema: {
-        networks: z.string().describe("Comma-separated list of network names to compare (e.g., 'ethereum,polygon,arbitrum')")
+        networks: z.string().describe("Comma-separated network names (ethereum,polygon,arbitrum)")
       }
     },
     ({ networks }) => {
       const networkList = networks.split(',').map(n => n.trim());
       return {
-      messages: [{
-        role: "user",
-        content: {
-          type: "text",
-          text: `Please compare these EVM networks: ${networkList.join(", ")}
+        messages: [{
+          role: "user",
+          content: {
+            type: "text",
+            text: `# Network Comparison
+
+**Objective**: Compare ${networkList.join(', ')} on key metrics
+
+## Comparison Metrics
+
+### 1. Network Health (Current)
+For each network, call:
+- \`get_chain_info\` for chain ID and current block
+- \`get_gas_price\` for current gas costs
+- \`get_latest_block\` for block time and recent activity
+
+### 2. Key Characteristics
+Compare across these dimensions:
+
+**Architecture**:
+- Execution layer (Rollup/Sidechain/L1)
+- Consensus mechanism
+- Finality
+- Decentralization level
+
+**Performance**:
+- Block time (seconds per block)
+- Transactions per second (TPS)
+- Confirmation time
+- Throughput
+
+**Costs**:
+- Current gas prices (in gwei)
+- Average transaction cost
+- Cost to deploy contract
+- Price trends
+
+**Security**:
+- Validator count / decentralization
+- Mainnet maturity
+- Track record
+- Security audits
+
+**Ecosystem**:
+- Major protocols deployed
+- Liquidity depth
+- Developer activity
+- Community size
+
+## Comparison Table
+
+Create table with:
+- Network name
+- Block time
+- TPS capacity
+- Current gas (gwei)
+- Est. tx cost (USD)
+- Security level
+- Best for
+
+## Analysis
 
 For each network:
-1. Call get_chain_info to get current chain ID and block number
-2. Call get_gas_price to understand current gas costs
-3. Provide comparison across:
-   - Chain characteristics (mainnet, testnet, etc.)
-   - Current gas prices
-   - Block time and finality
-   - Typical use cases and advantages
-   - Any known limitations or risks
-4. Provide a recommendation for which network to use based on:
-   - Transaction speed needs
-   - Cost considerations
-   - Ecosystem size and liquidity
-   - Security considerations
+- **Strengths**: What it does well
+- **Weaknesses**: Limitations
+- **Best Use Cases**: When to use
+- **Trade-offs**: Speed vs cost vs security
 
-Make the comparison easy to understand for someone deciding which network to use.`
-        }
-      }]
+## Recommendations
+
+Provide guidance:
+- For small frequent transactions: [network]
+- For large one-time transfers: [network]
+- For DeFi/trading: [network]
+- For NFTs: [network]
+- For cost optimization: [network]
+
+## Output Format
+
+**Network Comparison Analysis**
+
+[Comparison table]
+
+**Network Profiles**
+
+For each network:
+- Overview
+- Current metrics
+- Strengths
+- Weaknesses
+- Best use cases
+
+**Recommendations**
+
+Based on user needs:
+- Speed priority: [suggestion]
+- Cost priority: [suggestion]
+- Security priority: [suggestion]
+- Overall best: [suggestion]
+
+**Decision Matrix**
+
+Help user choose based on:
+- Transaction frequency
+- Transaction size
+- Budget constraints
+- Required finality
+- Ecosystem needs
+`
+          }
+        }]
       };
     }
   );
@@ -284,9 +774,9 @@ Make the comparison easy to understand for someone deciding which network to use
   server.registerPrompt(
     "check_network_status",
     {
-      description: "Check the current status and health of an EVM network",
+      description: "Check current network health and conditions",
       argsSchema: {
-        network: z.string().optional().describe("Network name. Defaults to Ethereum mainnet.")
+        network: z.string().optional().describe("Network name (default: ethereum)")
       }
     },
     ({ network = "ethereum" }) => ({
@@ -294,19 +784,98 @@ Make the comparison easy to understand for someone deciding which network to use
         role: "user",
         content: {
           type: "text",
-          text: `Please check the current status of the ${network} network:
+          text: `# Network Status Check
 
-1. Call get_chain_info to get chain ID, current block number, and RPC info
-2. Call get_latest_block to see recent block information
-3. Call get_gas_price to check current gas prices
-4. Provide a status report with:
-   - Network is healthy/operational
-   - Current block number and recent block times
-   - Current gas prices (base fee and priority fee)
-   - Any observations about network congestion
-   - Recommendations for transaction timing if applicable
+**Objective**: Assess health and current conditions of ${network}
 
-Be clear about whether now is a good time to transact on this network.`
+## Status Assessment
+
+### 1. Gather Current Data
+Call these read-only tools:
+- \`get_chain_info\` for chain ID and current block number
+- \`get_latest_block\` for block details and timing
+- \`get_gas_price\` for current gas prices
+
+### 2. Network Health Analysis
+
+**Block Production**:
+- Current block number
+- Block timing (normal ~12-15 sec for Ethereum)
+- Consistent vs irregular blocks
+- Any gaps or delays
+
+**Gas Market**:
+- Base fee level (in gwei)
+- Priority fee level
+- Gas price trend (up/down/stable)
+- Congestion level
+
+**Overall Status**:
+- Operational: Yes/No
+- Issues detected: Yes/No
+- Performance: Normal/Degraded/Critical
+
+### 3. Congestion Assessment
+
+Evaluate:
+- Current gas prices vs average
+- Pending transaction count
+- Memory pool size
+- Are transactions backing up?
+
+## Output Format
+
+**Network Status Report: ${network}**
+
+**Overall Status**
+- Operational Status: [Online/Degraded/Offline]
+- Current Block: [number]
+- Network Time: [timestamp]
+- Last Updated: [when]
+
+**Performance Metrics**
+- Block Time: [seconds] (normal: 12-15s)
+- Gas Base Fee: [gwei]
+- Priority Fee: [gwei]
+- Total Cost for Standard Tx: [estimate USD]
+
+**Congestion Level**
+- Level: [Low/Moderate/High/Critical]
+- Current vs Historical: [comparison]
+- Trend: [increasing/stable/decreasing]
+
+**Network Activity**
+- Blocks per minute: [rate]
+- Recent block details: [hash, time, tx count]
+- Network security: [indicators]
+
+**Recommendations**
+
+For **sending transactions now**:
+- Best for: [low-value / high-value / time-critical]
+- Gas setting: [standard / fast / extreme]
+- Estimated cost: [range]
+- Estimated wait time: [minutes]
+
+**If Congested**:
+- Consider using: [alternative networks]
+- Wait time: [estimated minutes]
+- Cost to expedite: [gas increase needed]
+
+**If Issues Detected**:
+- Known issues: [list if any]
+- Expected duration: [if known]
+- Recommended action: [wait / use alternate / etc]
+
+## Key Metrics
+
+Reference points for interpretation:
+- Ethereum normal block: 12-15 seconds
+- Polygon normal: 2 seconds
+- Arbitrum normal: <1 second
+- Normal gas: 20-50 gwei
+- High congestion: 100+ gwei
+`
         }
       }]
     })
