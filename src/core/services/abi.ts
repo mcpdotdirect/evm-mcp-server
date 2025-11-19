@@ -1,11 +1,12 @@
 import { type Address } from 'viem';
+import { resolveChainId, getSupportedNetworks } from '../chains.js';
 
 /**
- * Fetch contract ABI from Etherscan API
+ * Fetch contract ABI from Etherscan v2 API (unified endpoint for all EVM chains)
  * Requires ETHERSCAN_API_KEY environment variable to be set
  *
  * @param contractAddress The contract address to fetch ABI for
- * @param network The network to use (etherscan, polygonscan, etc.)
+ * @param network The network name or chain ID
  * @returns The contract ABI as a JSON string
  */
 export async function fetchContractABI(
@@ -14,35 +15,25 @@ export async function fetchContractABI(
 ): Promise<string> {
   const apiKey = process.env.ETHERSCAN_API_KEY;
   if (!apiKey) {
-    throw new Error('ETHERSCAN_API_KEY environment variable is not set. Set it to fetch contract ABIs.');
+    throw new Error('ETHERSCAN_API_KEY environment variable is not set. Set it to fetch contract ABIs from block explorers.');
   }
 
-  // Map network names to Etherscan-compatible API domains
-  const networkMap: { [key: string]: string } = {
-    'ethereum': 'https://api.etherscan.io',
-    'sepolia': 'https://api-sepolia.etherscan.io',
-    'polygon': 'https://api.polygonscan.com',
-    'mumbai': 'https://api-testnet.polygonscan.com',
-    'arbitrum': 'https://api.arbiscan.io',
-    'arbitrum-sepolia': 'https://api-sepolia.arbiscan.io',
-    'optimism': 'https://api-optimistic.etherscan.io',
-    'optimism-sepolia': 'https://api-sepolia-optimistic.etherscan.io',
-    'base': 'https://api.basescan.org',
-    'base-sepolia': 'https://api-sepolia.basescan.org',
-    'avalanche': 'https://api.snowtrace.io',
-    'avalanche-fuji': 'https://api-testnet.snowtrace.io',
-  };
-
-  const apiUrl = networkMap[network.toLowerCase()];
-  if (!apiUrl) {
-    throw new Error(`Network "${network}" is not supported for ABI fetching. Supported: ${Object.keys(networkMap).join(', ')}`);
+  // Resolve chain ID using the chains.ts utilities
+  let chainId: number;
+  try {
+    chainId = resolveChainId(network);
+  } catch (error) {
+    const supported = getSupportedNetworks();
+    throw new Error(`Network "${network}" is not supported. Supported: ${supported.join(', ')}`);
   }
 
   try {
-    const url = new URL(`${apiUrl}/api`);
+    // Use unified Etherscan v2 API endpoint
+    const url = new URL('https://api.etherscan.io/v2/api');
     url.searchParams.set('module', 'contract');
     url.searchParams.set('action', 'getabi');
     url.searchParams.set('address', contractAddress);
+    url.searchParams.set('chainid', chainId.toString());
     url.searchParams.set('apikey', apiKey);
 
     const response = await fetch(url.toString());
