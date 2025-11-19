@@ -765,6 +765,119 @@ export function registerEVMTools(server: McpServer) {
     }
   );
 
+  server.registerTool(
+    "write_contract",
+    {
+      description: "Execute state-changing functions on a smart contract. Automatically fetches ABI from block explorer if not provided (requires ETHERSCAN_API_KEY). Use this to call any write function on verified contracts. Requires EVM_PRIVATE_KEY to be configured.",
+      inputSchema: {
+        contractAddress: z.string().describe("The contract address"),
+        functionName: z.string().describe("Function name to call (e.g., 'mint', 'swap', 'stake', 'approve')"),
+        args: z.array(z.string()).optional().describe("Function arguments as strings (e.g., ['0xAddress', '1000000'])"),
+        value: z.string().optional().describe("ETH value to send with transaction in ether (e.g., '0.1' for payable functions)"),
+        abiJson: z.string().optional().describe("Full contract ABI as JSON string (optional - will auto-fetch verified contract ABI if not provided)"),
+        network: z.string().optional().describe("Network name or chain ID. Defaults to Ethereum mainnet.")
+      },
+      annotations: {
+        title: "Write to Smart Contract",
+        readOnlyHint: false,
+        destructiveHint: true,
+        idempotentHint: false,
+        openWorldHint: true
+      }
+    },
+    async ({ contractAddress, functionName, args = [], value, abiJson, network = "ethereum" }) => {
+      try {
+        const privateKey = getConfiguredPrivateKey();
+        const senderAddress = getWalletAddressFromKey();
+        const client = await services.getPublicClient(network);
+
+        let abi: any[] | undefined;
+        let functionAbi: any;
+
+        // If ABI is provided, use it
+        if (abiJson) {
+          try {
+            abi = services.parseABI(abiJson);
+            functionAbi = services.getFunctionFromABI(abi, functionName);
+          } catch (error) {
+            return {
+              content: [{
+                type: "text",
+                text: `Error parsing provided ABI: ${error instanceof Error ? error.message : String(error)}`
+              }],
+              isError: true
+            };
+          }
+        } else {
+          // Try to auto-fetch ABI from block explorer
+          try {
+            const fetchedAbi = await services.fetchContractABI(contractAddress as Address, network);
+            abi = services.parseABI(fetchedAbi);
+            functionAbi = services.getFunctionFromABI(abi, functionName);
+          } catch (fetchError) {
+            return {
+              content: [{
+                type: "text",
+                text: `Error: Could not auto-fetch ABI (${fetchError instanceof Error ? fetchError.message : String(fetchError)}). Please provide the contract ABI using the abiJson parameter, or use get_contract_abi to fetch it first.`
+              }],
+              isError: true
+            };
+          }
+        }
+
+        // Validate that this is not a view/pure function
+        if (functionAbi.stateMutability === 'view' || functionAbi.stateMutability === 'pure') {
+          return {
+            content: [{
+              type: "text",
+              text: `Error: Function '${functionName}' is a ${functionAbi.stateMutability} function and cannot modify state. Use read_contract instead.`
+            }],
+            isError: true
+          };
+        }
+
+        // Prepare write parameters
+        const writeParams: any = {
+          address: contractAddress as Address,
+          abi: [functionAbi],
+          functionName: functionName,
+          args: args as any
+        };
+
+        // Add value if provided (for payable functions)
+        if (value) {
+          const { parseEther } = await import('viem');
+          writeParams.value = parseEther(value);
+        }
+
+        // Execute the write operation
+        const txHash = await services.writeContract(privateKey, writeParams, network);
+
+        return {
+          content: [{
+            type: "text",
+            text: JSON.stringify({
+              network,
+              contractAddress,
+              function: functionName,
+              args: args.length > 0 ? args : undefined,
+              value: value || undefined,
+              from: senderAddress,
+              txHash,
+              abiSource: abiJson ? 'provided' : 'auto-fetched',
+              message: "Transaction sent. Use get_transaction_receipt or wait_for_transaction to check confirmation."
+            }, null, 2)
+          }]
+        };
+      } catch (error) {
+        return {
+          content: [{ type: "text", text: `Error writing to contract: ${error instanceof Error ? error.message : String(error)}` }],
+          isError: true
+        };
+      }
+    }
+  );
+
   // ============================================================================
   // TRANSFER TOOLS (Write operations)
   // ============================================================================

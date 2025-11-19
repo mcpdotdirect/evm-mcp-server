@@ -6,7 +6,7 @@
 ![MCP](https://img.shields.io/badge/MCP-1.22.0+-blue)
 ![Viem](https://img.shields.io/badge/Viem-2.39.3+-green)
 
-A comprehensive Model Context Protocol (MCP) server that provides blockchain services across 60+ EVM-compatible networks. This server enables AI agents to interact with Ethereum, Optimism, Arbitrum, Base, Polygon, and many other EVM chains with a unified interface through 21 tools and 9 AI-guided prompts.
+A comprehensive Model Context Protocol (MCP) server that provides blockchain services across 60+ EVM-compatible networks. This server enables AI agents to interact with Ethereum, Optimism, Arbitrum, Base, Polygon, and many other EVM chains with a unified interface through 22 tools and 10 AI-guided prompts.
 
 ## 📋 Contents
 
@@ -75,7 +75,7 @@ All services are exposed through a consistent interface of MCP tools, resources,
 ### Smart Contract Interactions
 
 - **Read contract state** through view/pure functions
-- **Write services** with private key signing
+- **Write to contracts** - Execute any state-changing function with automatic ABI fetching
 - **Contract verification** to distinguish from EOAs
 - **Event logs** retrieval and filtering
 - **Automatic ABI fetching** from Etherscan v2 API across all 60+ networks (no need to know ABIs in advance)
@@ -93,6 +93,7 @@ All services are exposed through a consistent interface of MCP tools, resources,
 - **Transaction preparation** - Guidance for planning and executing transfers
 - **Wallet analysis** - Tools for analyzing wallet activity and holdings
 - **Smart contract exploration** - Interactive ABI fetching and contract analysis
+- **Contract interaction** - Safe execution of write operations on smart contracts
 - **Network information** - Learning about EVM networks and comparisons
 - **Approval auditing** - Reviewing and managing token approvals
 - **Error diagnosis** - Troubleshooting transaction failures
@@ -440,7 +441,7 @@ console.log(result);
 
 ### Tools
 
-The server provides 21 focused MCP tools for agents. **All tools that accept address parameters support both Ethereum addresses and ENS names.**
+The server provides 22 focused MCP tools for agents. **All tools that accept address parameters support both Ethereum addresses and ENS names.**
 
 #### Wallet Information
 
@@ -487,6 +488,7 @@ The server provides 21 focused MCP tools for agents. **All tools that accept add
 |-----------|-------------|----------------|
 | `get_contract_abi` | Fetch contract ABI from block explorer (60+ networks) | `contractAddress` (address/ENS), `network` |
 | `read_contract` | Read smart contract state (auto-fetches ABI if needed) | `contractAddress`, `functionName`, `args[]`, `abiJson` (optional), `network` |
+| `write_contract` | Execute state-changing functions (auto-fetches ABI if needed) | `contractAddress`, `functionName`, `args[]`, `value` (optional), `abiJson` (optional), `network` |
 
 #### Token Transfers
 

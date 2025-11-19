@@ -46,8 +46,8 @@ Before executing any transfer:
 1. **Wallet Verification**: Call \`get_wallet_address\` to confirm the sending wallet
 2. **Balance Check**:
    ${tokenType === "native"
-     ? "- Call `get_balance` to verify native token balance"
-     : "- Call `get_token_balance` with tokenAddress=${tokenAddress} to verify balance"}
+              ? "- Call `get_balance` to verify native token balance"
+              : "- Call `get_token_balance` with tokenAddress=${tokenAddress} to verify balance"}
 3. **Gas Analysis**: Call \`get_gas_price\` to assess current network costs
 ${tokenType === "erc20" ? `4. **Approval Check**: Call \`get_allowance\` to verify approval (if needed for protocols)` : ""}
 
@@ -204,8 +204,8 @@ Provide structured diagnosis:
 
 ### 3. Token Balances
 ${tokenList.length > 0
-  ? `- Call \`get_token_balance\` for each token:\n${tokenList.map(t => `  * ${t}`).join('\n')}`
-  : `- If specific tokens provided: call \`get_token_balance\` for each
+                ? `- Call \`get_token_balance\` for each token:\n${tokenList.map(t => `  * ${t}`).join('\n')}`
+                : `- If specific tokens provided: call \`get_token_balance\` for each
 - Include token symbol and decimals if available`}
 
 ## Output Format
@@ -475,13 +475,13 @@ Look for:
 ## Exploration Strategy
 
 ${fetchAbi === 'true'
-  ? `### With Full ABI (Fetched)
+              ? `### With Full ABI (Fetched)
 1. Call \`get_contract_abi\` to fetch verified ABI
 2. Parse all available functions
 3. Call \`read_contract\` for important state functions
 4. Build comprehensive understanding
 `
-  : `### Without Full ABI (Probing)
+              : `### Without Full ABI (Probing)
 1. Test common function signatures
 2. Call \`read_contract\` with standard functions:
    - name(), symbol(), decimals(), totalSupply()
@@ -566,6 +566,179 @@ For each contract type:
   // ============================================================================
   // NETWORK & EDUCATION PROMPTS
   // ============================================================================
+
+  server.registerPrompt(
+    "interact_with_contract",
+    {
+      description: "Safely execute write operations on a smart contract with validation and confirmation",
+      argsSchema: {
+        contractAddress: z.string().describe("Contract address to interact with"),
+        functionName: z.string().describe("Function to call (e.g., 'mint', 'swap', 'stake')"),
+        args: z.string().optional().describe("Comma-separated function arguments"),
+        value: z.string().optional().describe("ETH value to send (for payable functions)"),
+        network: z.string().optional().describe("Network name (default: ethereum)")
+      }
+    },
+    ({ contractAddress, functionName, args, value, network = "ethereum" }) => {
+      const argsList = args ? args.split(',').map(a => a.trim()) : [];
+      return {
+        messages: [{
+          role: "user",
+          content: {
+            type: "text",
+            text: `# Smart Contract Interaction
+
+**Objective**: Safely execute ${functionName} on contract ${contractAddress} on ${network}
+
+## Prerequisites Check
+
+### 1. Wallet Verification
+- Call \`get_wallet_address\` to confirm the wallet that will execute this transaction
+- Verify this is the correct wallet for this operation
+
+### 2. Contract Analysis
+- Call \`get_contract_abi\` to fetch and analyze the contract ABI
+- Verify the function exists and understand its parameters
+- Check function type:
+  * **View/Pure**: Read-only (use \`read_contract\` instead)
+  * **Nonpayable**: State-changing, no ETH required
+  * **Payable**: State-changing, can accept ETH
+
+### 3. Function Parameter Validation
+For function: **${functionName}**
+${argsList.length > 0 ? `Arguments provided: ${argsList.join(', ')}` : 'No arguments provided'}
+
+- Verify parameter types match the ABI
+- Validate addresses are checksummed
+- Check numeric values are in correct units
+- Resolve any ENS names to addresses if needed
+
+### 4. Pre-execution Checks
+
+**Balance Check**:
+- Call \`get_balance\` to verify sufficient native token balance
+- Account for gas costs + value (if payable)
+
+**Gas Estimation**:
+- Call \`get_gas_price\` to estimate transaction cost
+- Calculate total cost: (gas_price * estimated_gas) + value
+
+**State Verification** (if applicable):
+- Use \`read_contract\` to check current contract state
+- Verify conditions are met (e.g., allowances, balances, ownership)
+
+## Execution Process
+
+### 1. Present Summary to User
+Before executing, show:
+- **Contract**: ${contractAddress}
+- **Network**: ${network}
+- **Function**: ${functionName}
+- **Arguments**: ${argsList.length > 0 ? argsList.join(', ') : 'None'}
+${value ? `- **Value**: ${value} ETH` : ''}
+- **From**: [wallet address from step 1]
+- **Estimated Gas Cost**: [from gas estimation]
+- **Total Cost**: [gas + value]
+
+### 2. Request User Confirmation
+⚠️ **IMPORTANT**: Always ask user to confirm before executing write operations
+- Clearly state what will happen
+- Show all costs involved
+- Explain any risks or irreversible actions
+
+### 3. Execute Transaction
+Only after user confirms:
+\`\`\`
+Call write_contract with:
+- contractAddress: "${contractAddress}"
+- functionName: "${functionName}"
+${argsList.length > 0 ? `- args: ${JSON.stringify(argsList)}` : ''}
+${value ? `- value: "${value}"` : ''}
+- network: "${network}"
+\`\`\`
+
+### 4. Monitor Transaction
+After execution:
+1. Return transaction hash to user
+2. Call \`wait_for_transaction\` to monitor confirmation
+3. Call \`get_transaction_receipt\` to verify success
+4. If failed, call \`diagnose_transaction\` to understand why
+
+## Output Format
+
+**Pre-Execution Summary**:
+- Contract details
+- Function and parameters
+- Cost breakdown
+- Risk assessment
+
+**Confirmation Request**:
+"Ready to execute ${functionName} on ${contractAddress}. This will cost approximately [X] ETH. Proceed? (yes/no)"
+
+**Execution Result**:
+- Transaction Hash: [hash]
+- Status: Pending/Confirmed/Failed
+- Block Number: [if confirmed]
+- Gas Used: [actual gas used]
+- Total Cost: [final cost]
+
+## Safety Considerations
+
+### Critical Checks
+- ✅ Verify contract is verified on block explorer
+- ✅ Check function parameters are correct type and format
+- ✅ Ensure sufficient balance for gas + value
+- ✅ Validate addresses (no typos, correct network)
+- ✅ Understand what the function does before calling
+
+### Common Risks
+- **Irreversible**: Most blockchain transactions cannot be undone
+- **Gas Loss**: Failed transactions still consume gas
+- **Approval Risks**: Be careful with unlimited approvals
+- **Reentrancy**: Some functions may be vulnerable
+- **Access Control**: Verify you have permission to call this function
+
+### Red Flags
+🚨 Stop and warn user if:
+- Contract is not verified
+- Function requires admin/owner privileges you don't have
+- Unusually high gas estimate
+- Suspicious parameter values
+- Contract has known vulnerabilities
+
+## Error Handling
+
+If transaction fails:
+1. Get the revert reason from receipt
+2. Check common issues:
+   - Insufficient balance/allowance
+   - Access control (onlyOwner, etc.)
+   - Invalid parameters
+   - Contract paused
+   - Slippage (for DEX operations)
+3. Provide actionable fix suggestions
+4. Offer to retry with corrected parameters
+
+## Example Workflow
+
+For a token mint operation:
+1. ✅ Verify wallet
+2. ✅ Fetch contract ABI
+3. ✅ Check mint function exists and is callable
+4. ✅ Verify sufficient ETH for gas
+5. ✅ Show summary: "Minting 1 NFT will cost ~0.002 ETH"
+6. ⏸️ Wait for user confirmation
+7. ✅ Execute write_contract
+8. ✅ Monitor transaction
+9. ✅ Confirm success and return token ID
+
+**Remember**: Always prioritize user safety and transparency!
+`
+          }
+        }]
+      };
+    }
+  );
 
   server.registerPrompt(
     "explain_evm_concept",
