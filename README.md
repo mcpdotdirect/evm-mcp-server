@@ -83,6 +83,7 @@ All services are exposed through a consistent interface of MCP tools, resources,
 
 ### Comprehensive Transaction Support
 
+- **Flexible Wallet Support** - Configure with Private Key or Mnemonic (BIP-39) with HD path support
 - **Native token transfers** across all supported networks
 - **Gas estimation** for transaction planning
 - **Transaction status** and receipt information
@@ -185,18 +186,40 @@ npm install
 
 The server uses the following environment variables. For write operations and ABI fetching, you must configure these variables:
 
-#### Private Key (For Write Operations)
+#### Wallet Configuration (For Write Operations)
+
+You can configure your wallet using **either** a private key or a mnemonic phrase:
+
+**Option 1: Private Key**
 
 ```bash
 export EVM_PRIVATE_KEY="0x..." # Your private key in hex format (with or without 0x prefix)
 ```
 
-This private key is used for:
+**Option 2: Mnemonic Phrase (Recommended for HD Wallets)**
+
+```bash
+export EVM_MNEMONIC="word1 word2 word3 ... word12" # Your 12 or 24 word BIP-39 mnemonic
+export EVM_ACCOUNT_INDEX="0" # Optional: Account index for HD wallet derivation (default: 0)
+```
+
+The mnemonic option supports hierarchical deterministic (HD) wallet derivation:
+- Uses BIP-39 standard mnemonic phrases (12 or 24 words)
+- Supports BIP-44 derivation path: `m/44'/60'/0'/0/{accountIndex}`
+- `EVM_ACCOUNT_INDEX` allows you to derive different accounts from the same mnemonic
+- Default account index is 0 (first account)
+
+**Wallet is used for:**
 - Transferring native tokens (`transfer_native` tool)
 - Transferring ERC20 tokens (`transfer_erc20` tool)
 - Approving token spending (`approve_token_spending` tool)
+- Writing to smart contracts (`write_contract` tool)
 
-⚠️ **Security**: Never commit your private key to version control. Use environment variables or a secure key management system.
+⚠️ **Security**: 
+- Never commit your private key or mnemonic to version control
+- Use environment variables or a secure key management system
+- Store mnemonics securely - they provide access to all derived accounts
+- Consider using different account indices for different purposes
 
 #### API Keys (For ABI Fetching)
 

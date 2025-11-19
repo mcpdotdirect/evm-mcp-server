@@ -3,15 +3,19 @@ import { z } from "zod";
 import { getSupportedNetworks, getRpcUrl } from "./chains.js";
 import * as services from "./services/index.js";
 import { type Address, type Hex, type Hash } from 'viem';
-import { privateKeyToAccount } from 'viem/accounts';
 import { normalize } from 'viem/ens';
 
 /**
  * Register all EVM-related tools with the MCP server
  *
- * SECURITY: The EVM_PRIVATE_KEY environment variable must be set for write operations.
- * Private keys are never passed as tool arguments for security reasons.
+ * SECURITY: Either EVM_PRIVATE_KEY or EVM_MNEMONIC environment variable must be set for write operations.
+ * Private keys and mnemonics are never passed as tool arguments for security reasons.
  * Tools will use the configured wallet for all transactions.
+ *
+ * Configuration options:
+ * - EVM_PRIVATE_KEY: Hex private key (with or without 0x prefix)
+ * - EVM_MNEMONIC: BIP-39 mnemonic phrase (12 or 24 words)
+ * - EVM_ACCOUNT_INDEX: Optional account index for HD wallet derivation (default: 0)
  *
  * All tools that accept addresses also support ENS names (e.g., 'vitalik.eth').
  * ENS names are automatically resolved to addresses using the Ethereum Name Service.
@@ -19,27 +23,8 @@ import { normalize } from 'viem/ens';
  * @param server The MCP server instance
  */
 export function registerEVMTools(server: McpServer) {
-  // Helper to get the configured private key from environment
-  const getConfiguredPrivateKey = (): Hex => {
-    const privateKey = process.env.EVM_PRIVATE_KEY;
-    if (!privateKey) {
-      throw new Error("EVM_PRIVATE_KEY environment variable is not set. Configure it to enable write operations.");
-    }
-    // Ensure 0x prefix
-    return (privateKey.startsWith('0x') ? privateKey : `0x${privateKey}`) as Hex;
-  };
-
-  // Helper to get wallet address from private key
-  const getWalletAddressFromKey = (): Address => {
-    const privateKey = getConfiguredPrivateKey();
-    const account = privateKeyToAccount(privateKey);
-    return account.address;
-  };
-
-  // Helper to get configured wallet object
-  const getConfiguredWallet = (): { address: Address } => {
-    return { address: getWalletAddressFromKey() };
-  };
+  // Helpers are now imported from services/wallet.ts
+  const { getConfiguredPrivateKey, getWalletAddressFromKey, getConfiguredWallet } = services;
 
   // ============================================================================
   // WALLET INFORMATION TOOLS (Read-only)
@@ -768,7 +753,7 @@ export function registerEVMTools(server: McpServer) {
   server.registerTool(
     "write_contract",
     {
-      description: "Execute state-changing functions on a smart contract. Automatically fetches ABI from block explorer if not provided (requires ETHERSCAN_API_KEY). Use this to call any write function on verified contracts. Requires EVM_PRIVATE_KEY to be configured.",
+      description: "Execute state-changing functions on a smart contract. Automatically fetches ABI from block explorer if not provided (requires ETHERSCAN_API_KEY). Use this to call any write function on verified contracts. Requires wallet to be configured (via private key or mnemonic).",
       inputSchema: {
         contractAddress: z.string().describe("The contract address"),
         functionName: z.string().describe("Function name to call (e.g., 'mint', 'swap', 'stake', 'approve')"),
