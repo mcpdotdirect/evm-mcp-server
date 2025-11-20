@@ -1,3 +1,24 @@
+# [2.0.0](https://github.com/mcpdotdirect/evm-mcp-server/compare/v1.2.0...v2.0.0) (2025-11-20)
+
+
+### Bug Fixes
+
+* add Express back for reliability and improve wallet.ts type safety ([07687b1](https://github.com/mcpdotdirect/evm-mcp-server/commit/07687b1f2f74ad05b4919e0d1342957665943188))
+* add production hardening for security and reliability ([b02dad9](https://github.com/mcpdotdirect/evm-mcp-server/commit/b02dad95a15628debc8ec129aee297d951f36fc0))
+
+
+### Features
+
+* add `write_contract` tool and `interact_with_contract` prompt for safe contract interaction. ([8cee62f](https://github.com/mcpdotdirect/evm-mcp-server/commit/8cee62f8ba8b2461153623473847c480624ebf93))
+* Add flexible wallet configuration supporting private key or mnemonic phrase, centralize wallet logic, and update documentation. ([9e2a0ac](https://github.com/mcpdotdirect/evm-mcp-server/commit/9e2a0ac103ad20e42ac14c405ab8c7acad8e78d7))
+* enhance prompt content and structure for token transfers, transaction diagnosis, and wallet analysis ([554ac8c](https://github.com/mcpdotdirect/evm-mcp-server/commit/554ac8ce2cd90fe4bead6aa9b7c51a9e9bd0bebc))
+* Refactor ABI fetching to use a unified Etherscan v2 API and enhance transaction prompts with detailed, safety-focused instructions. ([3b7bac3](https://github.com/mcpdotdirect/evm-mcp-server/commit/3b7bac33ca3852d93a6829a3b5f2524789efe7ed))
+* replace generic EVM prompts with new task-oriented workflows for transfers, diagnostics, wallet analysis, and approvals, and add an ABI service. ([1e1d879](https://github.com/mcpdotdirect/evm-mcp-server/commit/1e1d8799394e4903548dae7ead47896851235fe8))
+* Update MCP SDK, configure server capabilities, and bump server version to 2.0.0. ([25ab4d9](https://github.com/mcpdotdirect/evm-mcp-server/commit/25ab4d9d516298c0847968759fbe814283735945))
+* updated docs ([796245b](https://github.com/mcpdotdirect/evm-mcp-server/commit/796245bb7fea9a38fdd2b83cdb0702fc6b506c32))
+
+
+
 # [1.2.0](https://github.com/mcpdotdirect/evm-mcp-server/compare/v1.1.3...v1.2.0) (2025-05-23)
 
 
