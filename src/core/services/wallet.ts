@@ -12,7 +12,15 @@ import { privateKeyToAccount, mnemonicToAccount, type HDAccount, type PrivateKey
 export const getConfiguredAccount = (): HDAccount | PrivateKeyAccount => {
     const privateKey = process.env.EVM_PRIVATE_KEY;
     const mnemonic = process.env.EVM_MNEMONIC;
-    const accountIndex = parseInt(process.env.EVM_ACCOUNT_INDEX || '0');
+    const accountIndexStr = process.env.EVM_ACCOUNT_INDEX || '0';
+    const accountIndex = parseInt(accountIndexStr, 10);
+
+    // Validate account index
+    if (isNaN(accountIndex) || accountIndex < 0 || !Number.isInteger(accountIndex)) {
+        throw new Error(
+            `Invalid EVM_ACCOUNT_INDEX: "${accountIndexStr}". Must be a non-negative integer.`
+        );
+    }
 
     if (privateKey) {
         // Use private key if provided

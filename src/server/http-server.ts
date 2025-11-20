@@ -12,10 +12,30 @@ console.error(`Configured to listen on ${HOST}:${PORT}`);
 
 // Setup Express
 const app = express();
-app.use(express.json());
+app.use(express.json({ limit: '10mb' })); // Prevent DoS attacks with huge payloads
 
-// Track active transports by session ID
+// Track active transports by session ID with cleanup
 const transports = new Map<string, StreamableHTTPServerTransport>();
+const sessionTimestamps = new Map<string, number>();
+const SESSION_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
+
+// Cleanup stale sessions periodically
+setInterval(() => {
+  const now = Date.now();
+  for (const [sessionId, timestamp] of sessionTimestamps.entries()) {
+    if (now - timestamp > SESSION_TIMEOUT_MS) {
+      console.error(`Cleaning up stale session: ${sessionId}`);
+      const transport = transports.get(sessionId);
+      if (transport) {
+        transport.close().catch(err =>
+          console.error(`Error closing stale session ${sessionId}:`, err)
+        );
+      }
+      transports.delete(sessionId);
+      sessionTimestamps.delete(sessionId);
+    }
+  }
+}, 5 * 60 * 1000); // Check every 5 minutes
 
 // Initialize the MCP server
 let server: McpServer | null = null;
@@ -44,6 +64,7 @@ app.post("/mcp", async (req: Request, res: Response) => {
   if (sessionId && transports.has(sessionId)) {
     // Reuse existing transport for this session
     transport = transports.get(sessionId)!;
+    sessionTimestamps.set(sessionId, Date.now()); // Update last activity
     console.error(`Reusing transport for session: ${sessionId}`);
   } else if (!sessionId) {
     // New session - create transport with session ID generator
@@ -52,10 +73,12 @@ app.post("/mcp", async (req: Request, res: Response) => {
       onsessioninitialized: (newSessionId) => {
         console.error(`Session initialized: ${newSessionId}`);
         transports.set(newSessionId, transport);
+        sessionTimestamps.set(newSessionId, Date.now());
       },
       onsessionclosed: (closedSessionId) => {
         console.error(`Session closed: ${closedSessionId}`);
         transports.delete(closedSessionId);
+        sessionTimestamps.delete(closedSessionId);
       }
     });
 
@@ -191,3 +214,7 @@ const httpServer = app.listen(PORT, HOST, () => {
   console.error(`Server error: ${err}`);
   process.exit(1);
 });
+
+// Set server timeout to prevent hanging connections
+httpServer.timeout = 120000; // 2 minutes
+httpServer.keepAliveTimeout = 65000; // 65 seconds
