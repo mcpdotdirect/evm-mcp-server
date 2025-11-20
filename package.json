@@ -32,6 +32,7 @@
   },
   "devDependencies": {
     "@types/bun": "latest",
+    "@types/express": "^5.0.0",
     "@types/node": "^22.0.0",
     "conventional-changelog-cli": "^5.0.0"
   },
@@ -40,6 +41,7 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.22.0",
+    "express": "^4.21.2",
     "viem": "^2.39.3",
     "zod": "^3.24.3"
   },
