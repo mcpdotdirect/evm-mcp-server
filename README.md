@@ -475,11 +475,50 @@ console.log(result);
 // }
 ```
 
+### Example: Batch Multiple Calls with Multicall
+
+```javascript
+// Example of using multicall to batch multiple contract reads in a single RPC call
+const mcp = new McpClient("http://localhost:3000");
+
+const result = await mcp.invokeTool("multicall", {
+  network: "ethereum",
+  calls: [
+    {
+      contractAddress: "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48", // USDC
+      functionName: "balanceOf",
+      args: ["0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045"],
+    },
+    {
+      contractAddress: "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48", // USDC
+      functionName: "symbol",
+    },
+    {
+      contractAddress: "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48", // USDC
+      functionName: "decimals",
+    },
+  ],
+});
+
+console.log(result);
+// {
+//   network: "ethereum",
+//   totalCalls: 3,
+//   successfulCalls: 3,
+//   failedCalls: 0,
+//   results: [
+//     { contractAddress: "0xA0b...", functionName: "balanceOf", result: "1000000000", status: "success" },
+//     { contractAddress: "0xA0b...", functionName: "symbol", result: "USDC", status: "success" },
+//     { contractAddress: "0xA0b...", functionName: "decimals", result: "6", status: "success" }
+//   ]
+// }
+```
+
 ## 📚 API Reference
 
 ### Tools
 
-The server provides 24 focused MCP tools for agents. **All tools that accept address parameters support both Ethereum addresses and ENS names.**
+The server provides 25 focused MCP tools for agents. **All tools that accept address parameters support both Ethereum addresses and ENS names.**
 
 #### Wallet Information
 
@@ -522,11 +561,12 @@ The server provides 24 focused MCP tools for agents. **All tools that accept add
 
 #### Smart Contract Interactions
 
-| Tool Name          | Description                                                   | Key Parameters                                                                                   |
-| ------------------ | ------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
-| `get_contract_abi` | Fetch contract ABI from block explorer (60+ networks)         | `contractAddress` (address/ENS), `network`                                                       |
-| `read_contract`    | Read smart contract state (auto-fetches ABI if needed)        | `contractAddress`, `functionName`, `args[]`, `abiJson` (optional), `network`                     |
-| `write_contract`   | Execute state-changing functions (auto-fetches ABI if needed) | `contractAddress`, `functionName`, `args[]`, `value` (optional), `abiJson` (optional), `network` |
+| Tool Name          | Description                                                           | Key Parameters                                                                                   |
+| ------------------ | --------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| `get_contract_abi` | Fetch contract ABI from block explorer (60+ networks)                 | `contractAddress` (address/ENS), `network`                                                       |
+| `read_contract`    | Read smart contract state (auto-fetches ABI if needed)                | `contractAddress`, `functionName`, `args[]`, `abiJson` (optional), `network`                     |
+| `write_contract`   | Execute state-changing functions (auto-fetches ABI if needed)         | `contractAddress`, `functionName`, `args[]`, `value` (optional), `abiJson` (optional), `network` |
+| `multicall`        | Batch multiple read calls into a single RPC request (uses Multicall3) | `calls[]` (array of contract calls), `allowFailure` (optional), `network`                        |
 
 #### Token Transfers
 

@@ -863,6 +863,130 @@ export function registerEVMTools(server: McpServer) {
     }
   );
 
+  server.registerTool(
+    "multicall",
+    {
+      description: "Batch multiple contract read calls into a single RPC request. Significantly reduces latency and RPC usage when querying multiple functions. Uses the Multicall3 contract deployed on all major networks. Perfect for portfolio analysis, price aggregation, and querying multiple contract states efficiently.",
+      inputSchema: {
+        calls: z.array(z.object({
+          contractAddress: z.string().describe("The contract address"),
+          functionName: z.string().describe("Function name to call"),
+          args: z.array(z.string()).optional().describe("Function arguments as strings"),
+          abiJson: z.string().optional().describe("Contract ABI as JSON string (optional - will auto-fetch if not provided)")
+        })).describe("Array of contract calls to batch together"),
+        allowFailure: z.boolean().optional().describe("If true, returns partial results even if some calls fail. Defaults to true."),
+        network: z.string().optional().describe("Network name or chain ID. Defaults to Ethereum mainnet.")
+      },
+      annotations: {
+        title: "Multicall (Batch Read)",
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: true
+      }
+    },
+    async ({ calls, allowFailure = true, network = "ethereum" }) => {
+      try {
+        // Build contracts array with ABIs
+        const contractsWithAbis = await Promise.all(
+          calls.map(async (call) => {
+            let abi: any[];
+            let functionAbi: any;
+
+            // If ABI is provided, use it
+            if (call.abiJson) {
+              try {
+                abi = services.parseABI(call.abiJson);
+                functionAbi = services.getFunctionFromABI(abi, call.functionName);
+              } catch (error) {
+                throw new Error(`Error parsing ABI for ${call.contractAddress}: ${error instanceof Error ? error.message : String(error)}`);
+              }
+            } else {
+              // Try to auto-fetch ABI
+              try {
+                const fetchedAbi = await services.fetchContractABI(call.contractAddress as Address, network);
+                abi = services.parseABI(fetchedAbi);
+                functionAbi = services.getFunctionFromABI(abi, call.functionName);
+              } catch (fetchError) {
+                // Fall back to common function signatures
+                const commonFunctions: { [key: string]: any } = {
+                  'name': { inputs: [], outputs: [{ type: 'string' }], stateMutability: 'view' },
+                  'symbol': { inputs: [], outputs: [{ type: 'string' }], stateMutability: 'view' },
+                  'decimals': { inputs: [], outputs: [{ type: 'uint8' }], stateMutability: 'view' },
+                  'totalSupply': { inputs: [], outputs: [{ type: 'uint256' }], stateMutability: 'view' },
+                  'balanceOf': { inputs: [{ type: 'address' }], outputs: [{ type: 'uint256' }], stateMutability: 'view' },
+                  'allowance': { inputs: [{ type: 'address' }, { type: 'address' }], outputs: [{ type: 'uint256' }], stateMutability: 'view' },
+                };
+
+                if (!commonFunctions[call.functionName]) {
+                  throw new Error(`Could not auto-fetch ABI for ${call.contractAddress}. Function '${call.functionName}' not in common signatures. Please provide abiJson parameter.`);
+                }
+
+                functionAbi = {
+                  name: call.functionName,
+                  type: 'function',
+                  inputs: commonFunctions[call.functionName].inputs,
+                  outputs: commonFunctions[call.functionName].outputs,
+                  stateMutability: 'view'
+                };
+              }
+            }
+
+            return {
+              address: call.contractAddress as Address,
+              abi: [functionAbi],
+              functionName: call.functionName,
+              args: call.args || []
+            };
+          })
+        );
+
+        // Execute multicall
+        const results = await services.multicall(contractsWithAbis, allowFailure, network);
+
+        // Format results
+        const formattedResults = results.map((result: any, index: number) => {
+          const call = calls[index];
+          if (result.status === 'success') {
+            return {
+              contractAddress: call.contractAddress,
+              functionName: call.functionName,
+              args: call.args,
+              result: result.result?.toString(),
+              status: 'success'
+            };
+          } else {
+            return {
+              contractAddress: call.contractAddress,
+              functionName: call.functionName,
+              args: call.args,
+              error: result.error?.message || 'Unknown error',
+              status: 'failure'
+            };
+          }
+        });
+
+        return {
+          content: [{
+            type: "text",
+            text: JSON.stringify({
+              network,
+              totalCalls: calls.length,
+              successfulCalls: formattedResults.filter((r: any) => r.status === 'success').length,
+              failedCalls: formattedResults.filter((r: any) => r.status === 'failure').length,
+              results: formattedResults
+            }, null, 2)
+          }]
+        };
+      } catch (error) {
+        return {
+          content: [{ type: "text", text: `Error executing multicall: ${error instanceof Error ? error.message : String(error)}` }],
+          isError: true
+        };
+      }
+    }
+  );
+
   // ============================================================================
   // TRANSFER TOOLS (Write operations)
   // ============================================================================
