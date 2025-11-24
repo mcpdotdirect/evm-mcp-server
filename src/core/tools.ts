@@ -981,7 +981,7 @@ export function registerEVMTools(server: McpServer) {
       try {
         const privateKey = getConfiguredPrivateKey();
         const senderAddress = getWalletAddressFromKey();
-        const txHash = await services.approveERC20(privateKey, tokenAddress as Address, spenderAddress as Address, amount, network);
+        const txHash = await services.approveERC20(tokenAddress as Address, spenderAddress as Address, amount, privateKey, network);
         return {
           content: [{
             type: "text",
@@ -1085,6 +1085,112 @@ export function registerEVMTools(server: McpServer) {
       } catch (error) {
         return {
           content: [{ type: "text", text: `Error fetching ERC1155 balance: ${error instanceof Error ? error.message : String(error)}` }],
+          isError: true
+        };
+      }
+    }
+  );
+
+  // ============================================================================
+  // MESSAGE SIGNING TOOLS (Write operations)
+  // ============================================================================
+
+  server.registerTool(
+    "sign_message",
+    {
+      description: "Sign an arbitrary message using the configured wallet. Useful for authentication (SIWE), meta-transactions, and off-chain signatures. The signature can be verified on-chain or off-chain.",
+      inputSchema: {
+        message: z.string().describe("The message to sign (plain text or hex-encoded data)")
+      },
+      annotations: {
+        title: "Sign Message",
+        readOnlyHint: false,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false
+      }
+    },
+    async ({ message }) => {
+      try {
+        const senderAddress = getWalletAddressFromKey();
+        const signature = await services.signMessage(message);
+        return {
+          content: [{
+            type: "text",
+            text: JSON.stringify({
+              message,
+              signature,
+              signer: senderAddress,
+              messageType: "personal_sign"
+            }, null, 2)
+          }]
+        };
+      } catch (error) {
+        return {
+          content: [{ type: "text", text: `Error signing message: ${error instanceof Error ? error.message : String(error)}` }],
+          isError: true
+        };
+      }
+    }
+  );
+
+  server.registerTool(
+    "sign_typed_data",
+    {
+      description: "Sign structured data (EIP-712) using the configured wallet. Used for gasless transactions, meta-transactions, permit signatures, and protocol-specific signatures. The signature follows the EIP-712 standard.",
+      inputSchema: {
+        domainJson: z.string().describe("EIP-712 domain as JSON string with fields: name, version, chainId, verifyingContract, salt (all optional)"),
+        typesJson: z.string().describe("EIP-712 types definition as JSON string (exclude EIP712Domain type - it's added automatically)"),
+        primaryType: z.string().describe("The primary type name (e.g., 'Mail', 'Permit', 'MetaTransaction')"),
+        messageJson: z.string().describe("The message data to sign as JSON string")
+      },
+      annotations: {
+        title: "Sign Typed Data (EIP-712)",
+        readOnlyHint: false,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false
+      }
+    },
+    async ({ domainJson, typesJson, primaryType, messageJson }) => {
+      try {
+        const senderAddress = getWalletAddressFromKey();
+
+        // Parse JSON inputs
+        let domain, types, message;
+        try {
+          domain = JSON.parse(domainJson);
+          types = JSON.parse(typesJson);
+          message = JSON.parse(messageJson);
+        } catch (parseError) {
+          return {
+            content: [{
+              type: "text",
+              text: `Error parsing JSON inputs: ${parseError instanceof Error ? parseError.message : String(parseError)}`
+            }],
+            isError: true
+          };
+        }
+
+        const signature = await services.signTypedData(domain, types, primaryType, message);
+
+        return {
+          content: [{
+            type: "text",
+            text: JSON.stringify({
+              domain,
+              types,
+              primaryType,
+              message,
+              signature,
+              signer: senderAddress,
+              messageType: "EIP-712"
+            }, null, 2)
+          }]
+        };
+      } catch (error) {
+        return {
+          content: [{ type: "text", text: `Error signing typed data: ${error instanceof Error ? error.message : String(error)}` }],
           isError: true
         };
       }

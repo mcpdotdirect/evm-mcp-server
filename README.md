@@ -56,12 +56,14 @@ All services are exposed through a consistent interface of MCP tools, resources,
 ### Token services
 
 - **ERC20 Tokens**
+
   - Get token metadata (name, symbol, decimals, supply)
   - Check token balances
   - Transfer tokens between addresses
   - Approve spending allowances
 
 - **NFTs (ERC721)**
+
   - Get collection and token metadata
   - Verify token ownership
   - Transfer NFTs between addresses
@@ -89,6 +91,14 @@ All services are exposed through a consistent interface of MCP tools, resources,
 - **Transaction status** and receipt information
 - **Error handling** with descriptive messages
 
+### Message Signing Capabilities
+
+- **Personal Message Signing** - Sign arbitrary messages for authentication and verification
+- **EIP-712 Typed Data Signing** - Sign structured data for gasless transactions and meta-transactions
+- **SIWE Support** - Enable Sign-In With Ethereum authentication flows
+- **Permit Signatures** - Create off-chain approvals for gasless token operations
+- **Meta-Transaction Support** - Sign transaction data for relay services and gasless transfers
+
 ### AI-Guided Workflows (Prompts)
 
 - **Transaction preparation** - Guidance for planning and executing transfers
@@ -102,6 +112,7 @@ All services are exposed through a consistent interface of MCP tools, resources,
 ## 🌐 Supported Networks
 
 ### Mainnets
+
 - Ethereum (ETH)
 - Optimism (OP)
 - Arbitrum (ARB)
@@ -135,6 +146,7 @@ All services are exposed through a consistent interface of MCP tools, resources,
 - Lumia
 
 ### Testnets
+
 - Sepolia
 - Optimism Sepolia
 - Arbitrum Sepolia
@@ -204,18 +216,23 @@ export EVM_ACCOUNT_INDEX="0" # Optional: Account index for HD wallet derivation 
 ```
 
 The mnemonic option supports hierarchical deterministic (HD) wallet derivation:
+
 - Uses BIP-39 standard mnemonic phrases (12 or 24 words)
 - Supports BIP-44 derivation path: `m/44'/60'/0'/0/{accountIndex}`
 - `EVM_ACCOUNT_INDEX` allows you to derive different accounts from the same mnemonic
 - Default account index is 0 (first account)
 
 **Wallet is used for:**
+
 - Transferring native tokens (`transfer_native` tool)
 - Transferring ERC20 tokens (`transfer_erc20` tool)
 - Approving token spending (`approve_token_spending` tool)
 - Writing to smart contracts (`write_contract` tool)
+- Signing messages for authentication (`sign_message` tool)
+- Signing structured data for gasless transactions (`sign_typed_data` tool)
 
-⚠️ **Security**: 
+⚠️ **Security**:
+
 - Never commit your private key or mnemonic to version control
 - Use environment variables or a secure key management system
 - Store mnemonics securely - they provide access to all derived accounts
@@ -228,11 +245,13 @@ export ETHERSCAN_API_KEY="your-api-key-here"
 ```
 
 This API key is optional but required for:
+
 - Automatic ABI fetching from block explorers (`get_contract_abi` tool)
 - Auto-fetching ABIs when reading contracts (`read_contract` tool with `abiJson` parameter)
 - The `fetch_and_analyze_abi` prompt
 
 Get your free API key from:
+
 - [Etherscan](https://etherscan.io/apis) - For Ethereum and compatible chains
 - The same key works across all 60+ EVM networks via the Etherscan v2 API
 
@@ -298,6 +317,7 @@ To connect to the MCP server from Cursor:
 3. Scroll down to "MCP Servers" section
 4. Click "Add new MCP server"
 5. Enter the following details:
+
    - Server name: `evm-mcp-server`
    - Type: `command`
    - Command: `npx @mcpdotdirect/evm-mcp-server`
@@ -315,18 +335,11 @@ For a more portable configuration that you can share with your team or use acros
   "mcpServers": {
     "evm-mcp-server": {
       "command": "npx",
-      "args": [
-        "-y",
-        "@mcpdotdirect/evm-mcp-server"
-      ]
+      "args": ["-y", "@mcpdotdirect/evm-mcp-server"]
     },
     "evm-mcp-http": {
       "command": "npx",
-      "args": [
-        "-y", 
-        "@mcpdotdirect/evm-mcp-server", 
-        "--http"
-      ]
+      "args": ["-y", "@mcpdotdirect/evm-mcp-server", "--http"]
     }
   }
 }
@@ -353,11 +366,13 @@ If you're developing a web application and want to connect to the HTTP server wi
 ```
 
 This connects directly to the HTTP server's SSE endpoint, which is useful for:
+
 - Web applications that need to connect to the MCP server from the browser
 - Environments where running local commands isn't ideal
 - Sharing a single MCP server instance among multiple users or applications
 
 To use this configuration:
+
 1. Create a `.cursor` directory in your project root if it doesn't exist
 2. Save the above JSON as `mcp.json` in the `.cursor` directory
 3. Restart Cursor or open your project
@@ -375,14 +390,14 @@ async function main() {
   try {
     // Get ETH balance for an address using ENS
     console.log("Getting ETH balance for vitalik.eth...");
-    
+
     // When using with Cursor, you can simply ask Cursor to:
     // "Check the ETH balance of vitalik.eth on mainnet"
     // Or "Transfer 0.1 ETH from my wallet to vitalik.eth"
-    
-    // Cursor will use the MCP server to execute these operations 
+
+    // Cursor will use the MCP server to execute these operations
     // without requiring any additional code from you
-    
+
     // This is the power of the MCP integration - your AI assistant
     // can directly interact with blockchain data and operations
   } catch (error) {
@@ -425,7 +440,7 @@ const mcp = new McpClient("http://localhost:3000");
 const result = await mcp.invokeTool("get-token-balance", {
   tokenAddress: "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48", // USDC on Ethereum
   ownerAddress: "vitalik.eth", // ENS name instead of address
-  network: "ethereum"
+  network: "ethereum",
 });
 
 console.log(result);
@@ -448,7 +463,7 @@ const mcp = new McpClient("http://localhost:3000");
 
 const result = await mcp.invokeTool("resolve-ens", {
   ensName: "vitalik.eth",
-  network: "ethereum"
+  network: "ethereum",
 });
 
 console.log(result);
@@ -464,69 +479,76 @@ console.log(result);
 
 ### Tools
 
-The server provides 22 focused MCP tools for agents. **All tools that accept address parameters support both Ethereum addresses and ENS names.**
+The server provides 24 focused MCP tools for agents. **All tools that accept address parameters support both Ethereum addresses and ENS names.**
 
 #### Wallet Information
 
-| Tool Name | Description | Key Parameters |
-|-----------|-------------|----------------|
-| `get_wallet_address` | Get the address of the configured wallet (from EVM_PRIVATE_KEY) | none |
+| Tool Name            | Description                                                     | Key Parameters |
+| -------------------- | --------------------------------------------------------------- | -------------- |
+| `get_wallet_address` | Get the address of the configured wallet (from EVM_PRIVATE_KEY) | none           |
 
 #### Network Information
 
-| Tool Name | Description | Key Parameters |
-|-----------|-------------|----------------|
-| `get_chain_info` | Get network information | `network` |
-| `get_supported_networks` | List all supported EVM networks | none |
-| `get_gas_price` | Get current gas prices on a network | `network` |
+| Tool Name                | Description                         | Key Parameters |
+| ------------------------ | ----------------------------------- | -------------- |
+| `get_chain_info`         | Get network information             | `network`      |
+| `get_supported_networks` | List all supported EVM networks     | none           |
+| `get_gas_price`          | Get current gas prices on a network | `network`      |
 
 #### ENS Services
 
-| Tool Name | Description | Key Parameters |
-|-----------|-------------|----------------|
-| `resolve_ens_name` | Resolve ENS name to address | `ensName`, `network` |
+| Tool Name            | Description                        | Key Parameters       |
+| -------------------- | ---------------------------------- | -------------------- |
+| `resolve_ens_name`   | Resolve ENS name to address        | `ensName`, `network` |
 | `lookup_ens_address` | Reverse lookup address to ENS name | `address`, `network` |
 
 #### Block & Transaction Information
 
-| Tool Name | Description | Key Parameters |
-|-----------|-------------|----------------|
-| `get_block` | Get block data | `blockNumber` or `blockHash`, `network` |
-| `get_latest_block` | Get latest block data | `network` |
-| `get_transaction` | Get transaction details | `txHash`, `network` |
-| `get_transaction_receipt` | Get transaction receipt with logs | `txHash`, `network` |
-| `wait_for_transaction` | Wait for transaction confirmation | `txHash`, `confirmations`, `network` |
+| Tool Name                 | Description                       | Key Parameters                          |
+| ------------------------- | --------------------------------- | --------------------------------------- |
+| `get_block`               | Get block data                    | `blockNumber` or `blockHash`, `network` |
+| `get_latest_block`        | Get latest block data             | `network`                               |
+| `get_transaction`         | Get transaction details           | `txHash`, `network`                     |
+| `get_transaction_receipt` | Get transaction receipt with logs | `txHash`, `network`                     |
+| `wait_for_transaction`    | Wait for transaction confirmation | `txHash`, `confirmations`, `network`    |
 
 #### Balance & Token Information
 
-| Tool Name | Description | Key Parameters |
-|-----------|-------------|----------------|
-| `get_balance` | Get native token balance | `address` (address/ENS), `network` |
-| `get_token_balance` | Check ERC20 token balance | `tokenAddress` (address/ENS), `ownerAddress` (address/ENS), `network` |
-| `get_allowance` | Check token spending allowance | `tokenAddress` (address/ENS), `ownerAddress` (address/ENS), `spenderAddress` (address/ENS), `network` |
+| Tool Name           | Description                    | Key Parameters                                                                                        |
+| ------------------- | ------------------------------ | ----------------------------------------------------------------------------------------------------- |
+| `get_balance`       | Get native token balance       | `address` (address/ENS), `network`                                                                    |
+| `get_token_balance` | Check ERC20 token balance      | `tokenAddress` (address/ENS), `ownerAddress` (address/ENS), `network`                                 |
+| `get_allowance`     | Check token spending allowance | `tokenAddress` (address/ENS), `ownerAddress` (address/ENS), `spenderAddress` (address/ENS), `network` |
 
 #### Smart Contract Interactions
 
-| Tool Name | Description | Key Parameters |
-|-----------|-------------|----------------|
-| `get_contract_abi` | Fetch contract ABI from block explorer (60+ networks) | `contractAddress` (address/ENS), `network` |
-| `read_contract` | Read smart contract state (auto-fetches ABI if needed) | `contractAddress`, `functionName`, `args[]`, `abiJson` (optional), `network` |
-| `write_contract` | Execute state-changing functions (auto-fetches ABI if needed) | `contractAddress`, `functionName`, `args[]`, `value` (optional), `abiJson` (optional), `network` |
+| Tool Name          | Description                                                   | Key Parameters                                                                                   |
+| ------------------ | ------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| `get_contract_abi` | Fetch contract ABI from block explorer (60+ networks)         | `contractAddress` (address/ENS), `network`                                                       |
+| `read_contract`    | Read smart contract state (auto-fetches ABI if needed)        | `contractAddress`, `functionName`, `args[]`, `abiJson` (optional), `network`                     |
+| `write_contract`   | Execute state-changing functions (auto-fetches ABI if needed) | `contractAddress`, `functionName`, `args[]`, `value` (optional), `abiJson` (optional), `network` |
 
 #### Token Transfers
 
-| Tool Name | Description | Key Parameters |
-|-----------|-------------|----------------|
-| `transfer_native` | Send native tokens (ETH, etc.) | `to` (address/ENS), `amount`, `network` |
-| `transfer_erc20` | Transfer ERC20 tokens | `tokenAddress` (address/ENS), `to` (address/ENS), `amount`, `network` |
-| `approve_token_spending` | Approve token allowances | `tokenAddress` (address/ENS), `spenderAddress` (address/ENS), `amount`, `network` |
+| Tool Name                | Description                    | Key Parameters                                                                    |
+| ------------------------ | ------------------------------ | --------------------------------------------------------------------------------- |
+| `transfer_native`        | Send native tokens (ETH, etc.) | `to` (address/ENS), `amount`, `network`                                           |
+| `transfer_erc20`         | Transfer ERC20 tokens          | `tokenAddress` (address/ENS), `to` (address/ENS), `amount`, `network`             |
+| `approve_token_spending` | Approve token allowances       | `tokenAddress` (address/ENS), `spenderAddress` (address/ENS), `amount`, `network` |
 
 #### NFT Services
 
-| Tool Name | Description | Key Parameters |
-|-----------|-------------|----------------|
-| `get_nft_info` | Get NFT (ERC721) metadata | `tokenAddress` (address/ENS), `tokenId`, `network` |
-| `get_erc1155_balance` | Check ERC1155 balance | `tokenAddress` (address/ENS), `tokenId`, `ownerAddress` (address/ENS), `network` |
+| Tool Name             | Description               | Key Parameters                                                                   |
+| --------------------- | ------------------------- | -------------------------------------------------------------------------------- |
+| `get_nft_info`        | Get NFT (ERC721) metadata | `tokenAddress` (address/ENS), `tokenId`, `network`                               |
+| `get_erc1155_balance` | Check ERC1155 balance     | `tokenAddress` (address/ENS), `tokenId`, `ownerAddress` (address/ENS), `network` |
+
+#### Message Signing
+
+| Tool Name         | Description                                                                              | Key Parameters                                          |
+| ----------------- | ---------------------------------------------------------------------------------------- | ------------------------------------------------------- |
+| `sign_message`    | Sign arbitrary messages for authentication and verification (SIWE, off-chain signatures) | `message`                                               |
+| `sign_typed_data` | Sign EIP-712 structured data for gasless transactions, permits, and meta-transactions    | `domainJson`, `typesJson`, `primaryType`, `messageJson` |
 
 ### Resources
 
@@ -534,26 +556,26 @@ The server exposes blockchain data through the following MCP resource URIs. All 
 
 #### Blockchain Resources
 
-| Resource URI Pattern | Description |
-|-----------|-------------|
-| `evm://{network}/chain` | Chain information for a specific network |
-| `evm://chain` | Ethereum mainnet chain information |
-| `evm://{network}/block/{blockNumber}` | Block data by number |
-| `evm://{network}/block/latest` | Latest block data |
-| `evm://{network}/address/{address}/balance` | Native token balance |
-| `evm://{network}/tx/{txHash}` | Transaction details |
-| `evm://{network}/tx/{txHash}/receipt` | Transaction receipt with logs |
+| Resource URI Pattern                        | Description                              |
+| ------------------------------------------- | ---------------------------------------- |
+| `evm://{network}/chain`                     | Chain information for a specific network |
+| `evm://chain`                               | Ethereum mainnet chain information       |
+| `evm://{network}/block/{blockNumber}`       | Block data by number                     |
+| `evm://{network}/block/latest`              | Latest block data                        |
+| `evm://{network}/address/{address}/balance` | Native token balance                     |
+| `evm://{network}/tx/{txHash}`               | Transaction details                      |
+| `evm://{network}/tx/{txHash}/receipt`       | Transaction receipt with logs            |
 
 #### Token Resources
 
-| Resource URI Pattern | Description |
-|-----------|-------------|
-| `evm://{network}/token/{tokenAddress}` | ERC20 token information |
-| `evm://{network}/token/{tokenAddress}/balanceOf/{address}` | ERC20 token balance |
-| `evm://{network}/nft/{tokenAddress}/{tokenId}` | NFT (ERC721) token information |
-| `evm://{network}/nft/{tokenAddress}/{tokenId}/isOwnedBy/{address}` | NFT ownership verification |
-| `evm://{network}/erc1155/{tokenAddress}/{tokenId}/uri` | ERC1155 token URI |
-| `evm://{network}/erc1155/{tokenAddress}/{tokenId}/balanceOf/{address}` | ERC1155 token balance |
+| Resource URI Pattern                                                   | Description                    |
+| ---------------------------------------------------------------------- | ------------------------------ |
+| `evm://{network}/token/{tokenAddress}`                                 | ERC20 token information        |
+| `evm://{network}/token/{tokenAddress}/balanceOf/{address}`             | ERC20 token balance            |
+| `evm://{network}/nft/{tokenAddress}/{tokenId}`                         | NFT (ERC721) token information |
+| `evm://{network}/nft/{tokenAddress}/{tokenId}/isOwnedBy/{address}`     | NFT ownership verification     |
+| `evm://{network}/erc1155/{tokenAddress}/{tokenId}/uri`                 | ERC1155 token URI              |
+| `evm://{network}/erc1155/{tokenAddress}/{tokenId}/balanceOf/{address}` | ERC1155 token balance          |
 
 ## 🔒 Security Considerations
 
