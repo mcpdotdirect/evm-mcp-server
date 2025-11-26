@@ -863,6 +863,130 @@ export function registerEVMTools(server: McpServer) {
     }
   );
 
+  server.registerTool(
+    "multicall",
+    {
+      description: "Batch multiple contract read calls into a single RPC request. Significantly reduces latency and RPC usage when querying multiple functions. Uses the Multicall3 contract deployed on all major networks. Perfect for portfolio analysis, price aggregation, and querying multiple contract states efficiently.",
+      inputSchema: {
+        calls: z.array(z.object({
+          contractAddress: z.string().describe("The contract address"),
+          functionName: z.string().describe("Function name to call"),
+          args: z.array(z.string()).optional().describe("Function arguments as strings"),
+          abiJson: z.string().optional().describe("Contract ABI as JSON string (optional - will auto-fetch if not provided)")
+        })).describe("Array of contract calls to batch together"),
+        allowFailure: z.boolean().optional().describe("If true, returns partial results even if some calls fail. Defaults to true."),
+        network: z.string().optional().describe("Network name or chain ID. Defaults to Ethereum mainnet.")
+      },
+      annotations: {
+        title: "Multicall (Batch Read)",
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: true
+      }
+    },
+    async ({ calls, allowFailure = true, network = "ethereum" }) => {
+      try {
+        // Build contracts array with ABIs
+        const contractsWithAbis = await Promise.all(
+          calls.map(async (call) => {
+            let abi: any[];
+            let functionAbi: any;
+
+            // If ABI is provided, use it
+            if (call.abiJson) {
+              try {
+                abi = services.parseABI(call.abiJson);
+                functionAbi = services.getFunctionFromABI(abi, call.functionName);
+              } catch (error) {
+                throw new Error(`Error parsing ABI for ${call.contractAddress}: ${error instanceof Error ? error.message : String(error)}`);
+              }
+            } else {
+              // Try to auto-fetch ABI
+              try {
+                const fetchedAbi = await services.fetchContractABI(call.contractAddress as Address, network);
+                abi = services.parseABI(fetchedAbi);
+                functionAbi = services.getFunctionFromABI(abi, call.functionName);
+              } catch (fetchError) {
+                // Fall back to common function signatures
+                const commonFunctions: { [key: string]: any } = {
+                  'name': { inputs: [], outputs: [{ type: 'string' }], stateMutability: 'view' },
+                  'symbol': { inputs: [], outputs: [{ type: 'string' }], stateMutability: 'view' },
+                  'decimals': { inputs: [], outputs: [{ type: 'uint8' }], stateMutability: 'view' },
+                  'totalSupply': { inputs: [], outputs: [{ type: 'uint256' }], stateMutability: 'view' },
+                  'balanceOf': { inputs: [{ type: 'address' }], outputs: [{ type: 'uint256' }], stateMutability: 'view' },
+                  'allowance': { inputs: [{ type: 'address' }, { type: 'address' }], outputs: [{ type: 'uint256' }], stateMutability: 'view' },
+                };
+
+                if (!commonFunctions[call.functionName]) {
+                  throw new Error(`Could not auto-fetch ABI for ${call.contractAddress}. Function '${call.functionName}' not in common signatures. Please provide abiJson parameter.`);
+                }
+
+                functionAbi = {
+                  name: call.functionName,
+                  type: 'function',
+                  inputs: commonFunctions[call.functionName].inputs,
+                  outputs: commonFunctions[call.functionName].outputs,
+                  stateMutability: 'view'
+                };
+              }
+            }
+
+            return {
+              address: call.contractAddress as Address,
+              abi: [functionAbi],
+              functionName: call.functionName,
+              args: call.args || []
+            };
+          })
+        );
+
+        // Execute multicall
+        const results = await services.multicall(contractsWithAbis, allowFailure, network);
+
+        // Format results
+        const formattedResults = results.map((result: any, index: number) => {
+          const call = calls[index];
+          if (result.status === 'success') {
+            return {
+              contractAddress: call.contractAddress,
+              functionName: call.functionName,
+              args: call.args,
+              result: result.result?.toString(),
+              status: 'success'
+            };
+          } else {
+            return {
+              contractAddress: call.contractAddress,
+              functionName: call.functionName,
+              args: call.args,
+              error: result.error?.message || 'Unknown error',
+              status: 'failure'
+            };
+          }
+        });
+
+        return {
+          content: [{
+            type: "text",
+            text: JSON.stringify({
+              network,
+              totalCalls: calls.length,
+              successfulCalls: formattedResults.filter((r: any) => r.status === 'success').length,
+              failedCalls: formattedResults.filter((r: any) => r.status === 'failure').length,
+              results: formattedResults
+            }, null, 2)
+          }]
+        };
+      } catch (error) {
+        return {
+          content: [{ type: "text", text: `Error executing multicall: ${error instanceof Error ? error.message : String(error)}` }],
+          isError: true
+        };
+      }
+    }
+  );
+
   // ============================================================================
   // TRANSFER TOOLS (Write operations)
   // ============================================================================
@@ -981,7 +1105,7 @@ export function registerEVMTools(server: McpServer) {
       try {
         const privateKey = getConfiguredPrivateKey();
         const senderAddress = getWalletAddressFromKey();
-        const txHash = await services.approveERC20(privateKey, tokenAddress as Address, spenderAddress as Address, amount, network);
+        const txHash = await services.approveERC20(tokenAddress as Address, spenderAddress as Address, amount, privateKey, network);
         return {
           content: [{
             type: "text",
@@ -1085,6 +1209,112 @@ export function registerEVMTools(server: McpServer) {
       } catch (error) {
         return {
           content: [{ type: "text", text: `Error fetching ERC1155 balance: ${error instanceof Error ? error.message : String(error)}` }],
+          isError: true
+        };
+      }
+    }
+  );
+
+  // ============================================================================
+  // MESSAGE SIGNING TOOLS (Write operations)
+  // ============================================================================
+
+  server.registerTool(
+    "sign_message",
+    {
+      description: "Sign an arbitrary message using the configured wallet. Useful for authentication (SIWE), meta-transactions, and off-chain signatures. The signature can be verified on-chain or off-chain.",
+      inputSchema: {
+        message: z.string().describe("The message to sign (plain text or hex-encoded data)")
+      },
+      annotations: {
+        title: "Sign Message",
+        readOnlyHint: false,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false
+      }
+    },
+    async ({ message }) => {
+      try {
+        const senderAddress = getWalletAddressFromKey();
+        const signature = await services.signMessage(message);
+        return {
+          content: [{
+            type: "text",
+            text: JSON.stringify({
+              message,
+              signature,
+              signer: senderAddress,
+              messageType: "personal_sign"
+            }, null, 2)
+          }]
+        };
+      } catch (error) {
+        return {
+          content: [{ type: "text", text: `Error signing message: ${error instanceof Error ? error.message : String(error)}` }],
+          isError: true
+        };
+      }
+    }
+  );
+
+  server.registerTool(
+    "sign_typed_data",
+    {
+      description: "Sign structured data (EIP-712) using the configured wallet. Used for gasless transactions, meta-transactions, permit signatures, and protocol-specific signatures. The signature follows the EIP-712 standard.",
+      inputSchema: {
+        domainJson: z.string().describe("EIP-712 domain as JSON string with fields: name, version, chainId, verifyingContract, salt (all optional)"),
+        typesJson: z.string().describe("EIP-712 types definition as JSON string (exclude EIP712Domain type - it's added automatically)"),
+        primaryType: z.string().describe("The primary type name (e.g., 'Mail', 'Permit', 'MetaTransaction')"),
+        messageJson: z.string().describe("The message data to sign as JSON string")
+      },
+      annotations: {
+        title: "Sign Typed Data (EIP-712)",
+        readOnlyHint: false,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false
+      }
+    },
+    async ({ domainJson, typesJson, primaryType, messageJson }) => {
+      try {
+        const senderAddress = getWalletAddressFromKey();
+
+        // Parse JSON inputs
+        let domain, types, message;
+        try {
+          domain = JSON.parse(domainJson);
+          types = JSON.parse(typesJson);
+          message = JSON.parse(messageJson);
+        } catch (parseError) {
+          return {
+            content: [{
+              type: "text",
+              text: `Error parsing JSON inputs: ${parseError instanceof Error ? parseError.message : String(parseError)}`
+            }],
+            isError: true
+          };
+        }
+
+        const signature = await services.signTypedData(domain, types, primaryType, message);
+
+        return {
+          content: [{
+            type: "text",
+            text: JSON.stringify({
+              domain,
+              types,
+              primaryType,
+              message,
+              signature,
+              signer: senderAddress,
+              messageType: "EIP-712"
+            }, null, 2)
+          }]
+        };
+      } catch (error) {
+        return {
+          content: [{ type: "text", text: `Error signing typed data: ${error instanceof Error ? error.message : String(error)}` }],
           isError: true
         };
       }

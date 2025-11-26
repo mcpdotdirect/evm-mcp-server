@@ -55,8 +55,10 @@ export const getConfiguredPrivateKey = (): Hex => {
         if (!hdKey.privateKey) {
             throw new Error("Unable to derive private key from HD account - no private key in HD key");
         }
-        // Convert Uint8Array to hex string
-        const privateKeyHex = Buffer.from(hdKey.privateKey).toString('hex');
+        // Convert Uint8Array to hex string (compatible with Bun and Node)
+        const privateKeyHex = Array.from(hdKey.privateKey)
+            .map(byte => byte.toString(16).padStart(2, '0'))
+            .join('');
         return `0x${privateKeyHex}` as Hex;
     }
 
@@ -84,4 +86,53 @@ export const getWalletAddressFromKey = (): Address => {
  */
 export const getConfiguredWallet = (): { address: Address } => {
     return { address: getWalletAddressFromKey() };
+};
+
+/**
+ * Sign an arbitrary message using the configured wallet
+ * @param message The message to sign (can be a string or hex data)
+ * @returns The signature as a hex string
+ */
+export const signMessage = async (message: string): Promise<string> => {
+    const account = getConfiguredAccount();
+
+    // Use the account's signMessage method directly
+    const signature = await account.signMessage({
+        message: message
+    });
+
+    return signature;
+};
+
+/**
+ * Sign typed data (EIP-712) using the configured wallet
+ * @param domain The EIP-712 domain
+ * @param types The types definition (excluding EIP712Domain)
+ * @param primaryType The primary type name
+ * @param message The message data to sign
+ * @returns The signature as a hex string
+ */
+export const signTypedData = async (
+    domain: {
+        name?: string;
+        version?: string;
+        chainId?: number;
+        verifyingContract?: Address;
+        salt?: `0x${string}`;
+    },
+    types: Record<string, Array<{ name: string; type: string }>>,
+    primaryType: string,
+    message: Record<string, any>
+): Promise<string> => {
+    const account = getConfiguredAccount();
+
+    // Use the account's signTypedData method
+    const signature = await account.signTypedData({
+        domain,
+        types,
+        primaryType,
+        message
+    });
+
+    return signature;
 };

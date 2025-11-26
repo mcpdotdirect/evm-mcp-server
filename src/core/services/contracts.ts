@@ -1,6 +1,6 @@
-import { 
-  type Address, 
-  type Hash, 
+import {
+  type Address,
+  type Hash,
   type Hex,
   type ReadContractParameters,
   type GetLogsParameters,
@@ -46,8 +46,33 @@ export async function getLogs(params: GetLogsParameters, network = 'ethereum'): 
 export async function isContract(addressOrEns: string, network = 'ethereum'): Promise<boolean> {
   // Resolve ENS name to address if needed
   const address = await resolveAddress(addressOrEns, network);
-  
+
   const client = getPublicClient(network);
   const code = await client.getBytecode({ address });
   return code !== undefined && code !== '0x';
+}
+
+/**
+ * Batch multiple contract read calls into a single RPC request using Multicall3
+ * @param contracts Array of contract calls to batch
+ * @param allowFailure If true, returns partial results even if some calls fail
+ * @param network Network name or chain ID
+ * @returns Array of results with status
+ */
+export async function multicall(
+  contracts: Array<{
+    address: Address;
+    abi: any[];
+    functionName: string;
+    args?: any[];
+  }>,
+  allowFailure = true,
+  network = 'ethereum'
+): Promise<any> {
+  const client = getPublicClient(network);
+
+  return await client.multicall({
+    contracts: contracts as any,
+    allowFailure
+  });
 } 
