@@ -56,7 +56,7 @@
     "ai",
     "agent"
   ],
-  "author": "Etheral <etheral.eth.dev@gmail.com>",
+  "author": "vcart <info@mcp.direct>",
   "license": "MIT",
   "engines": {
     "node": ">=20.0.0"
