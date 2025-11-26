@@ -32,7 +32,7 @@ jobs:
     permissions:
       contents: write
       packages: write
-      id-token: write # Required for npm Trusted Publishing
+      id-token: write
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -44,8 +44,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '18.x'
-          # This registry-url is crucial; it tells npm to use registry.npmjs.org
-          # and prepares the .npmrc for OIDC authentication.
           registry-url: 'https://registry.npmjs.org'
 
       - name: Setup Bun
@@ -78,9 +76,7 @@ jobs:
 
       - name: Generate Changelog
         run: |
-          # Generate the full changelog
           npm run changelog
-          # Generate release notes for just this version
           npm run changelog:latest
 
       - name: Build project
@@ -95,11 +91,8 @@ jobs:
 
       - name: Create and push tag
         run: |
-          # Delete the tag if it already exists locally
           git tag -d "v${{ env.VERSION }}" 2>/dev/null || true
-          # Delete the tag if it exists on the remote
           git push origin --delete "v${{ env.VERSION }}" 2>/dev/null || true
-          # Create and push the new tag
           git tag -a "v${{ env.VERSION }}" -m "Release v${{ env.VERSION }}"
           git push origin "v${{ env.VERSION }}"
 
@@ -114,5 +107,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.PAT_GITHUB }}
 
       - name: Publish to npm
-        # No env variable needed here; auth is handled by id-token and registry-url
         run: npm publish --access public --provenance --tag ${{ github.event.inputs.dist_tag || 'latest' }}
+        env:
+          # Restored the token here to ensure it works
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
