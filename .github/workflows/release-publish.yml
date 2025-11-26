@@ -32,7 +32,7 @@ jobs:
     permissions:
       contents: write
       packages: write
-      id-token: write
+      id-token: write # Required for npm Trusted Publishing
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -44,6 +44,8 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '18.x'
+          # This registry-url is crucial; it tells npm to use registry.npmjs.org
+          # and prepares the .npmrc for OIDC authentication.
           registry-url: 'https://registry.npmjs.org'
 
       - name: Setup Bun
@@ -112,6 +114,5 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.PAT_GITHUB }}
 
       - name: Publish to npm
+        # No env variable needed here; auth is handled by id-token and registry-url
         run: npm publish --access public --provenance --tag ${{ github.event.inputs.dist_tag || 'latest' }}
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }} 
