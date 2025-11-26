@@ -1,3 +1,17 @@
+## [2.0.1](https://github.com/mcpdotdirect/evm-mcp-server/compare/v2.0.0...v2.0.1) (2025-11-26)
+
+
+### Bug Fixes
+
+* critical bug fixes and add message signing capabilities ([8591ac2](https://github.com/mcpdotdirect/evm-mcp-server/commit/8591ac2b87ddaafb5f7d8862a177c452dd740053))
+
+
+### Features
+
+* add multicall support for batch contract reads ([dd3c354](https://github.com/mcpdotdirect/evm-mcp-server/commit/dd3c354fff315866982fcf85b8c67e6f120f1ef2))
+
+
+
 # [2.0.0](https://github.com/mcpdotdirect/evm-mcp-server/compare/v1.2.0...v2.0.0) (2025-11-20)
 
 

@@ -2,7 +2,7 @@
   "name": "@mcpdotdirect/evm-mcp-server",
   "module": "src/index.ts",
   "type": "module",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "description": "MCP server for interacting with EVM-compatible blockchains - supports 22 tools and 10 prompts across 60+ networks",
   "bin": {
     "evm-mcp-server": "./bin/cli.js"
