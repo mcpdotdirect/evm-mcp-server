@@ -1,4 +1,5 @@
 import { type Chain } from 'viem';
+import { getAlchemyRpcUrl } from './alchemy.js';
 import {
   // Mainnets
   mainnet,
@@ -342,7 +343,14 @@ export function getRpcUrl(chainIdentifier: number | string = DEFAULT_CHAIN_ID): 
   const chainId = typeof chainIdentifier === 'string' 
     ? resolveChainId(chainIdentifier) 
     : chainIdentifier;
-    
+
+  if (process.env.ALCHEMY_API_KEY) {
+    const alchemyUrl = getAlchemyRpcUrl(chainId, process.env.ALCHEMY_API_KEY);
+    if (alchemyUrl) {
+      return alchemyUrl;
+    }
+  }
+
   return rpcUrlMap[chainId] || DEFAULT_RPC_URL;
 }
 
