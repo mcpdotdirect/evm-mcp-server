@@ -667,3 +667,8 @@ To modify or extend the server:
 ## 📄 License
 
 This project is licensed under the terms of the [MIT License](./LICENSE).
+
+## Hosted deployment
+
+A hosted deployment is available on [Fronteir AI](https://fronteir.ai/mcp/mcpdotdirect-evm-mcp-server).
+
