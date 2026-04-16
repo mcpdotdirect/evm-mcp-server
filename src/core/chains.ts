@@ -32,7 +32,8 @@ import {
   aurora,
   canto,
   flowMainnet,
-  
+  radius,
+
   // Testnets
   sepolia,
   optimismSepolia,
@@ -57,7 +58,8 @@ import {
   goerli,
   holesky,
   flowTestnet,
-  filecoinCalibration
+  filecoinCalibration,
+  radiusTestnet
 } from 'viem/chains';
 
 // Default configuration values
@@ -98,7 +100,8 @@ export const chainMap: Record<number, Chain> = {
   1313161554: aurora,
   7700: canto,
   747: flowMainnet,
-  
+  723487: radius,
+
   // Testnets
   11155111: sepolia,
   11155420: optimismSepolia,
@@ -124,6 +127,7 @@ export const chainMap: Record<number, Chain> = {
   17000: holesky,
   545: flowTestnet,
   314159: filecoinCalibration,
+  72344: radiusTestnet,
 };
 
 // Map network names to chain IDs for easier reference
@@ -172,7 +176,10 @@ export const networkNameMap: Record<string, number> = {
   'aurora': 1313161554,
   'canto': 7700,
   'flow': 747,
-  
+  'radius': 723487,
+  'radius-network': 723487,
+  'radiusnetwork': 723487,
+
   // Testnets
   'sepolia': 11155111,
   'optimism-sepolia': 11155420,
@@ -218,6 +225,8 @@ export const networkNameMap: Record<string, number> = {
   'holesky': 17000,
   'flow-testnet': 545,
   'filecoin-calibration': 314159,
+  'radius-testnet': 72344,
+  'radiustestnet': 72344,
 };
 
 // Map chain IDs to RPC URLs
@@ -254,7 +263,8 @@ export const rpcUrlMap: Record<number, string> = {
   1313161554: 'https://mainnet.aurora.dev',
   7700: 'https://canto.gravitychain.io',
   747: 'https://mainnet.evm.nodes.onflow.org',
-  
+  723487: 'https://rpc.radiustech.xyz',
+
   // Testnets
   11155111: 'https://sepolia.drpc.org',
   11155420: 'https://sepolia.optimism.io',
@@ -280,6 +290,7 @@ export const rpcUrlMap: Record<number, string> = {
   17000: 'https://ethereum-holesky.publicnode.com',
   545: 'https://testnet.evm.nodes.onflow.org',
   314159: 'https://api.calibration.node.glif.io/rpc/v1',
+  72344: 'https://rpc.testnet.radiustech.xyz',
 };
 
 /**
