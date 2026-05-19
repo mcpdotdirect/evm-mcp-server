@@ -33,8 +33,12 @@
   "devDependencies": {
     "@types/bun": "latest",
     "@types/express": "^5.0.0",
+    "@types/jest": "^30.0.0",
     "@types/node": "^22.0.0",
-    "conventional-changelog-cli": "^5.0.0"
+    "conventional-changelog-cli": "^5.0.0",
+    "jest": "^30.4.2",
+    "ts-jest": "^29.4.9",
+    "typescript": "^5.9.3"
   },
   "peerDependencies": {
     "typescript": "^5.8.2"
