@@ -238,6 +238,16 @@ The mnemonic option supports hierarchical deterministic (HD) wallet derivation:
 - Store mnemonics securely - they provide access to all derived accounts
 - Consider using different account indices for different purposes
 
+
+#### Alchemy configuration
+
+```bash
+export ALCHEMY_API_KEY="your-alchemy-api-key-here"
+```
+
+If you use [Alchemy](https://alchemy.com) and want to use its RPC endpoints, you can specify app's API key.
+Otherwise, default JSON RPC rate-limited endpoints will be used. 
+
 #### API Keys (For ABI Fetching)
 
 ```bash
