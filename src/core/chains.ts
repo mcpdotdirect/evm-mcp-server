@@ -289,26 +289,25 @@ export const rpcUrlMap: Record<number, string> = {
  */
 export function resolveChainId(chainIdentifier: number | string): number {
   if (typeof chainIdentifier === 'number') {
+    if (!chainMap[chainIdentifier]) {
+      throw new Error(`Unsupported chain ID: ${chainIdentifier}. Use a supported network.`);
+    }
     return chainIdentifier;
   }
-  
-  // Convert to lowercase for case-insensitive matching
+
   const networkName = chainIdentifier.toLowerCase();
-  
-  // Check if the network name is in our map
+
   const chainId = networkNameMap[networkName];
   if (chainId !== undefined) {
     return chainId;
   }
-  
-  // Try parsing as a number
+
   const parsedId = parseInt(networkName);
-  if (!isNaN(parsedId)) {
+  if (!isNaN(parsedId) && chainMap[parsedId]) {
     return parsedId;
   }
-  
-  // Default to mainnet if not found
-  return DEFAULT_CHAIN_ID;
+
+  throw new Error(`Unknown network: "${chainIdentifier}". Supported: ${getSupportedNetworks().slice(0, 10).join(', ')}...`);
 }
 
 /**
@@ -320,17 +319,19 @@ export function resolveChainId(chainIdentifier: number | string): number {
 export function getChain(chainIdentifier: number | string = DEFAULT_CHAIN_ID): Chain {
   if (typeof chainIdentifier === 'string') {
     const networkName = chainIdentifier.toLowerCase();
-    // Try to get from direct network name mapping first
     if (networkNameMap[networkName]) {
-      return chainMap[networkNameMap[networkName]] || mainnet;
+      const chain = chainMap[networkNameMap[networkName]];
+      if (!chain) throw new Error(`Chain config missing for network: ${chainIdentifier}`);
+      return chain;
     }
-    
-    // If not found, throw an error
     throw new Error(`Unsupported network: ${chainIdentifier}`);
   }
-  
-  // If it's a number, return the chain from chainMap
-  return chainMap[chainIdentifier] || mainnet;
+
+  const chain = chainMap[chainIdentifier];
+  if (!chain) {
+    throw new Error(`Unsupported chain ID: ${chainIdentifier}`);
+  }
+  return chain;
 }
 
 /**

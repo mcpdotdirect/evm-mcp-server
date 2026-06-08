@@ -6,6 +6,17 @@ import { type Address, type Hex, type Hash } from 'viem';
 import { normalize } from 'viem/ens';
 
 /**
+ * Validates an Ethereum address format (0x + 40 hex chars).
+ * Throws if invalid. Allows ENS names (containing '.') to pass through.
+ */
+function validateAddressOrEns(value: string, label = 'Address'): void {
+  if (value.includes('.')) return;
+  if (!/^0x[a-fA-F0-9]{40}$/.test(value)) {
+    throw new Error(`${label} must be a valid Ethereum address (0x + 40 hex chars) or ENS name`);
+  }
+}
+
+/**
  * Register all EVM-related tools with the MCP server
  *
  * SECURITY: Either EVM_PRIVATE_KEY or EVM_MNEMONIC environment variable must be set for write operations.
@@ -666,6 +677,7 @@ export function registerEVMTools(server: McpServer) {
     },
     async ({ contractAddress, functionName, args = [], abiJson, network = "ethereum" }) => {
       try {
+        validateAddressOrEns(contractAddress, 'Contract address');
         const client = await services.getPublicClient(network);
 
         let abi: any[] | undefined;
@@ -772,6 +784,7 @@ export function registerEVMTools(server: McpServer) {
     },
     async ({ contractAddress, functionName, args = [], value, abiJson, network = "ethereum" }) => {
       try {
+        validateAddressOrEns(contractAddress, 'Contract address');
         const privateKey = getConfiguredPrivateKey();
         const senderAddress = getWalletAddressFromKey();
         const client = await services.getPublicClient(network);
@@ -1010,6 +1023,7 @@ export function registerEVMTools(server: McpServer) {
     },
     async ({ to, amount, network = "ethereum" }) => {
       try {
+        validateAddressOrEns(to, 'Recipient address');
         const privateKey = getConfiguredPrivateKey();
         const senderAddress = getWalletAddressFromKey();
         const txHash = await services.transferETH(privateKey, to as Address, amount, network);
@@ -1055,6 +1069,8 @@ export function registerEVMTools(server: McpServer) {
     },
     async ({ tokenAddress, to, amount, network = "ethereum" }) => {
       try {
+        validateAddressOrEns(tokenAddress, 'Token address');
+        validateAddressOrEns(to, 'Recipient address');
         const privateKey = getConfiguredPrivateKey();
         const senderAddress = getWalletAddressFromKey();
         const result = await services.transferERC20(tokenAddress as Address, to as Address, amount, privateKey, network);

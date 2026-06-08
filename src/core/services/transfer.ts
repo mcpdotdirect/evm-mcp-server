@@ -13,6 +13,23 @@ import { getPublicClient, getWalletClient } from './clients.js';
 import { getChain } from '../chains.js';
 import { resolveAddress } from './ens.js';
 
+/**
+ * Validates that a string represents a positive numeric amount.
+ * Prevents negative values, non-numeric strings, and excessively large amounts.
+ */
+function validateAmount(amount: string, label = 'Amount'): void {
+  if (!/^\d+(\.\d+)?$/.test(amount)) {
+    throw new Error(`${label} must be a positive number (got: "${amount}")`);
+  }
+  const parsed = parseFloat(amount);
+  if (parsed <= 0) {
+    throw new Error(`${label} must be greater than zero`);
+  }
+  if (parsed > 1e18) {
+    throw new Error(`${label} exceeds maximum allowed value`);
+  }
+}
+
 // Standard ERC20 ABI for transfers
 const erc20TransferAbi = [
   {
@@ -137,6 +154,7 @@ export async function transferETH(
     : privateKey as Hex;
   
   const client = getWalletClient(formattedKey, network);
+  validateAmount(amount, 'ETH amount');
   const amountWei = parseEther(amount);
   
   return client.sendTransaction({
@@ -195,11 +213,12 @@ export async function transferERC20(
   const symbol = await contract.read.symbol();
   
   // Parse the amount with the correct number of decimals
+  validateAmount(amount, 'Token amount');
   const rawAmount = parseUnits(amount, decimals);
-  
+
   // Create wallet client for sending the transaction
   const walletClient = getWalletClient(formattedKey, network);
-  
+
   // Send the transaction
   const hash = await walletClient.writeContract({
     address: tokenAddress,
@@ -271,11 +290,12 @@ export async function approveERC20(
   const symbol = await contract.read.symbol();
   
   // Parse the amount with the correct number of decimals
+  validateAmount(amount, 'Approval amount');
   const rawAmount = parseUnits(amount, decimals);
-  
+
   // Create wallet client for sending the transaction
   const walletClient = getWalletClient(formattedKey, network);
-  
+
   // Send the transaction
   const hash = await walletClient.writeContract({
     address: tokenAddress,
@@ -412,6 +432,7 @@ export async function transferERC1155(
   const fromAddress = walletClient.account!.address;
   
   // Parse amount to bigint
+  validateAmount(amount, 'ERC1155 amount');
   const amountBigInt = BigInt(amount);
   
   // Send the transaction
