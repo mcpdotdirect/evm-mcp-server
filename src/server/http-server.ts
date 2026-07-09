@@ -154,11 +154,13 @@ app.delete("/mcp", async (req: Request, res: Response) => {
 
 // Health check endpoint
 app.get("/health", (_req: Request, res: Response) => {
+  // Only expose non-sensitive liveness data. Active session IDs are the
+  // sole authentication token for reusing an MCP transport on POST /mcp,
+  // so they must never be disclosed to unauthenticated callers.
   res.status(200).json({
     status: "ok",
     server: server ? "initialized" : "initializing",
-    activeSessions: transports.size,
-    sessionIds: Array.from(transports.keys())
+    activeSessions: transports.size
   });
 });
 
