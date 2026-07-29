@@ -1,52 +1,43 @@
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { McpServer } from "@modelcontextprotocol/server";
 import { registerEVMResources } from "../core/resources.js";
 import { registerEVMTools } from "../core/tools.js";
 import { registerEVMPrompts } from "../core/prompts.js";
-import { getSupportedNetworks } from "../core/chains.js";
+import { CACHE_SCOPE, CACHE_TTL_MS, SERVER_INFO, SERVER_INSTRUCTIONS } from "./protocol.js";
 
-// Create and start the MCP server
-async function startServer() {
-  try {
-    // Create a new MCP server instance with capabilities
-    const server = new McpServer(
-      {
-        name: "evm-mcp-server",
-        version: "2.0.0"
+// Create the MCP server used by the stdio and per-request HTTP serving entries.
+function createServer() {
+  const cacheHint = {
+    ttlMs: CACHE_TTL_MS,
+    cacheScope: CACHE_SCOPE
+  } as const;
+
+  const server = new McpServer(
+    SERVER_INFO,
+    {
+      capabilities: {
+        tools: { listChanged: false },
+        resources: { listChanged: false, subscribe: false },
+        prompts: { listChanged: false }
       },
-      {
-        capabilities: {
-          tools: {
-            listChanged: true
-          },
-          resources: {
-            subscribe: false,
-            listChanged: true
-          },
-          prompts: {
-            listChanged: true
-          },
-          logging: {}
-        }
+      instructions: SERVER_INSTRUCTIONS,
+      cacheHints: {
+        "server/discover": cacheHint,
+        "tools/list": cacheHint,
+        "prompts/list": cacheHint,
+        "resources/list": cacheHint,
+        "resources/templates/list": cacheHint,
+        "resources/read": cacheHint
       }
-    );
+    }
+  );
 
-    // Register all resources, tools, and prompts
-    registerEVMResources(server);
-    registerEVMTools(server);
-    registerEVMPrompts(server);
+  // Register all resources, tools, and prompts.
+  registerEVMResources(server);
+  registerEVMTools(server);
+  registerEVMPrompts(server);
 
-    // Log server information
-    console.error(`EVM MCP Server v2.0.0 initialized`);
-    console.error(`Protocol: MCP 2025-06-18`);
-    console.error(`Supported networks: ${getSupportedNetworks().length} networks`);
-    console.error("Server is ready to handle requests");
-
-    return server;
-  } catch (error) {
-    console.error("Failed to initialize server:", error);
-    process.exit(1);
-  }
+  return server;
 }
 
 // Export the server creation function
-export default startServer;
+export default createServer;

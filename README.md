@@ -3,10 +3,10 @@
 ![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)
 ![EVM Networks](https://img.shields.io/badge/Networks-60+-green)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.8+-3178C6)
-![MCP](https://img.shields.io/badge/MCP-1.22.0+-blue)
+![MCP](https://img.shields.io/badge/MCP-2026--07--28-blue)
 ![Viem](https://img.shields.io/badge/Viem-2.39.3+-green)
 
-A comprehensive Model Context Protocol (MCP) server that provides blockchain services across 60+ EVM-compatible networks. This server enables AI agents to interact with Ethereum, Optimism, Arbitrum, Base, Polygon, and many other EVM chains with a unified interface through 22 tools and 10 AI-guided prompts.
+A comprehensive Model Context Protocol (MCP) server that provides blockchain services across 60+ EVM-compatible networks. This server enables AI agents to interact with Ethereum, Optimism, Arbitrum, Base, Polygon, and many other EVM chains with a unified interface through 25 tools and 10 AI-guided prompts.
 
 ## 📋 Contents
 
@@ -257,16 +257,17 @@ Get your free API key from:
 
 ### Server Configuration
 
-The server uses the following default configuration:
+The HTTP server uses the following default configuration:
 
 - **Default Chain ID**: 1 (Ethereum Mainnet)
-- **Server Port**: 3001
-- **Server Host**: 0.0.0.0 (accessible from any network interface)
+- **Server Port**: `3001` (`MCP_PORT`)
+- **Server Host**: `127.0.0.1` (`MCP_HOST`)
+- **Allowed Host headers**: Localhost hostnames (`MCP_ALLOWED_HOSTS`, comma-separated)
+- **Allowed Origin hostnames**: Localhost hostnames (`MCP_ALLOWED_ORIGINS`, comma-separated)
 
-These values are hardcoded in the application. If you need to modify them, you can edit the following files:
+When binding to a non-local interface, explicitly configure the public hostnames accepted by `MCP_ALLOWED_HOSTS` and `MCP_ALLOWED_ORIGINS`. Values may be hostnames or origin URLs; validation is port-agnostic.
 
-- For chain configuration: `src/core/chains.ts`
-- For server configuration: `src/server/http-server.ts`
+Chain defaults and RPC endpoints are configured in `src/core/chains.ts`.
 
 ## 🚀 Usage
 
@@ -294,7 +295,7 @@ bun start
 bun dev
 ```
 
-Or start the HTTP server with SSE for web applications:
+Or start the stateless Streamable HTTP server for web applications:
 
 ```bash
 # Start the HTTP server
@@ -336,10 +337,6 @@ For a more portable configuration that you can share with your team or use acros
     "evm-mcp-server": {
       "command": "npx",
       "args": ["-y", "@mcpdotdirect/evm-mcp-server"]
-    },
-    "evm-mcp-http": {
-      "command": "npx",
-      "args": ["-y", "@mcpdotdirect/evm-mcp-server", "--http"]
     }
   }
 }
@@ -351,32 +348,45 @@ Place this file in your project's `.cursor` directory (create it if it doesn't e
 2. Version control your MCP setup
 3. Use different server configurations for different projects
 
-### Example: HTTP Mode with SSE
+### Example: Streamable HTTP Mode
 
-If you're developing a web application and want to connect to the HTTP server with Server-Sent Events (SSE), you can use this configuration:
+The HTTP entrypoint uses MCP `2026-07-28` stateless Streamable HTTP on `POST /mcp`. It does not mint `Mcp-Session-Id` values, and `GET /mcp` or `DELETE /mcp` return `405 Method Not Allowed`. HTTP is modern-only; stdio additionally serves legacy MCP `2025-11-25` clients through the SDK's version negotiation.
 
-```json
-{
-  "mcpServers": {
-    "evm-mcp-sse": {
-      "url": "http://localhost:3001/sse"
+Modern HTTP clients must send:
+
+- `Accept: application/json, text/event-stream`
+- `MCP-Protocol-Version: 2026-07-28`
+- `Mcp-Method: <json-rpc method>`
+- `Mcp-Name: <tool name, resource URI, or prompt name>` for `tools/call`, `resources/read`, and `prompts/get`
+- `params._meta.io.modelcontextprotocol/protocolVersion`
+- `params._meta.io.modelcontextprotocol/clientCapabilities`
+
+Clients should also send `params._meta.io.modelcontextprotocol/clientInfo`. The final specification makes client identity optional, so the server accepts a request when that field is absent.
+
+Example discovery request:
+
+```bash
+curl -X POST http://127.0.0.1:3001/mcp \
+  -H 'Content-Type: application/json' \
+  -H 'Accept: application/json, text/event-stream' \
+  -H 'MCP-Protocol-Version: 2026-07-28' \
+  -H 'Mcp-Method: server/discover' \
+  --data '{
+    "jsonrpc": "2.0",
+    "id": "discover-1",
+    "method": "server/discover",
+    "params": {
+      "_meta": {
+        "io.modelcontextprotocol/protocolVersion": "2026-07-28",
+        "io.modelcontextprotocol/clientInfo": {
+          "name": "example-client",
+          "version": "1.0.0"
+        },
+        "io.modelcontextprotocol/clientCapabilities": {}
+      }
     }
-  }
-}
+  }'
 ```
-
-This connects directly to the HTTP server's SSE endpoint, which is useful for:
-
-- Web applications that need to connect to the MCP server from the browser
-- Environments where running local commands isn't ideal
-- Sharing a single MCP server instance among multiple users or applications
-
-To use this configuration:
-
-1. Create a `.cursor` directory in your project root if it doesn't exist
-2. Save the above JSON as `mcp.json` in the `.cursor` directory
-3. Restart Cursor or open your project
-4. Cursor will detect the configuration and offer to enable the server(s)
 
 ### Example: Using the MCP Server in Cursor
 
@@ -632,7 +642,9 @@ mcp-evm-server/
 ├── src/
 │   ├── index.ts                # Main stdio server entry point
 │   ├── server/                 # Server-related files
-│   │   ├── http-server.ts      # HTTP server with SSE
+│   │   ├── http-server.ts      # Stateless Streamable HTTP server
+│   │   ├── protocol.ts         # Shared protocol metadata
+│   │   ├── stdio-server.ts     # SDK-native dual-era stdio entry
 │   │   └── server.ts           # General server setup
 │   ├── core/
 │   │   ├── chains.ts           # Chain definitions and utilities
@@ -662,7 +674,7 @@ To modify or extend the server:
 2. Register new tools in `src/core/tools.ts`
 3. Register new resources in `src/core/resources.ts`
 4. Add new network support in `src/core/chains.ts`
-5. To change server configuration, edit the hardcoded values in `src/server/http-server.ts`
+5. Configure the HTTP listener with `MCP_PORT`, `MCP_HOST`, `MCP_ALLOWED_HOSTS`, and `MCP_ALLOWED_ORIGINS`
 
 ## 📄 License
 
