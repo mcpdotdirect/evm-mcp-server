@@ -61,7 +61,6 @@ import {
 } from 'viem/chains';
 
 // Default configuration values
-export const DEFAULT_RPC_URL = 'https://eth.llamarpc.com';
 export const DEFAULT_CHAIN_ID = 1;
 
 // Map chain IDs to chains
@@ -288,49 +287,34 @@ export const rpcUrlMap: Record<number, string> = {
  * @returns The resolved chain ID
  */
 export function resolveChainId(chainIdentifier: number | string): number {
-  if (typeof chainIdentifier === 'number') {
+  if (typeof chainIdentifier === 'string') {
+    const normalizedIdentifier = chainIdentifier.toLowerCase();
+    const namedChainId = networkNameMap[normalizedIdentifier];
+    if (namedChainId !== undefined) {
+      return namedChainId;
+    }
+
+    if (/^\d+$/.test(normalizedIdentifier)) {
+      const numericChainId = Number(normalizedIdentifier);
+      if (Number.isSafeInteger(numericChainId) && chainMap[numericChainId]) {
+        return numericChainId;
+      }
+    }
+  } else if (Number.isSafeInteger(chainIdentifier) && chainMap[chainIdentifier]) {
     return chainIdentifier;
   }
-  
-  // Convert to lowercase for case-insensitive matching
-  const networkName = chainIdentifier.toLowerCase();
-  
-  // Check if the network name is in our map
-  const chainId = networkNameMap[networkName];
-  if (chainId !== undefined) {
-    return chainId;
-  }
-  
-  // Try parsing as a number
-  const parsedId = parseInt(networkName);
-  if (!isNaN(parsedId)) {
-    return parsedId;
-  }
-  
-  // Default to mainnet if not found
-  return DEFAULT_CHAIN_ID;
+
+  throw new Error(`Unsupported network: ${chainIdentifier}`);
 }
 
 /**
  * Returns the chain configuration for the specified chain ID or network name
  * @param chainIdentifier Chain ID (number) or network name (string)
  * @returns The chain configuration
- * @throws Error if the network is not supported (when string is provided)
+ * @throws Error if the network or chain ID is not supported
  */
 export function getChain(chainIdentifier: number | string = DEFAULT_CHAIN_ID): Chain {
-  if (typeof chainIdentifier === 'string') {
-    const networkName = chainIdentifier.toLowerCase();
-    // Try to get from direct network name mapping first
-    if (networkNameMap[networkName]) {
-      return chainMap[networkNameMap[networkName]] || mainnet;
-    }
-    
-    // If not found, throw an error
-    throw new Error(`Unsupported network: ${chainIdentifier}`);
-  }
-  
-  // If it's a number, return the chain from chainMap
-  return chainMap[chainIdentifier] || mainnet;
+  return chainMap[resolveChainId(chainIdentifier)];
 }
 
 /**
@@ -339,19 +323,21 @@ export function getChain(chainIdentifier: number | string = DEFAULT_CHAIN_ID): C
  * @returns The RPC URL for the specified chain
  */
 export function getRpcUrl(chainIdentifier: number | string = DEFAULT_CHAIN_ID): string {
-  const chainId = typeof chainIdentifier === 'string' 
-    ? resolveChainId(chainIdentifier) 
-    : chainIdentifier;
-    
-  return rpcUrlMap[chainId] || DEFAULT_RPC_URL;
+  return rpcUrlMap[resolveChainId(chainIdentifier)];
 }
 
 /**
- * Get a list of supported networks
- * @returns Array of supported network names (excluding short aliases)
+ * Get the configured network names and aliases.
+ * @returns Array of supported network names and aliases
  */
 export function getSupportedNetworks(): string[] {
   return Object.keys(networkNameMap)
-    .filter(name => name.length > 2) // Filter out short aliases
     .sort();
-} 
+}
+
+/**
+ * Get the number of distinct configured chain IDs.
+ */
+export function getSupportedChainCount(): number {
+  return Object.keys(chainMap).length;
+}

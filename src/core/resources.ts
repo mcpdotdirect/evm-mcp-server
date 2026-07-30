@@ -18,7 +18,7 @@ export function registerEVMResources(server: McpServer) {
     "supported_networks",
     "evm://networks",
     {
-      description: "Get list of all supported EVM networks and their configuration",
+      description: "Get the configured names and aliases for all supported EVM networks",
       mimeType: "application/json",
       cacheHint: {
         ttlMs: 60 * 60 * 1000,

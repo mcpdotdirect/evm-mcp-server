@@ -1,5 +1,5 @@
 import { serveStdio, type StdioServerHandle } from "@modelcontextprotocol/server/stdio";
-import { getSupportedNetworks } from "../core/chains.js";
+import { getSupportedChainCount, getSupportedNetworks } from "../core/chains.js";
 import createServer from "./server.js";
 import { LEGACY_PROTOCOL_VERSION, MODERN_PROTOCOL_VERSION, SERVER_INFO } from "./protocol.js";
 
@@ -9,7 +9,9 @@ import { LEGACY_PROTOCOL_VERSION, MODERN_PROTOCOL_VERSION, SERVER_INFO } from ".
 export function runStdioServer(): StdioServerHandle {
   console.error(`EVM MCP Server v${SERVER_INFO.version} running on stdio`);
   console.error(`Protocol: MCP ${MODERN_PROTOCOL_VERSION} (modern), MCP ${LEGACY_PROTOCOL_VERSION} (legacy)`);
-  console.error(`Supported networks: ${getSupportedNetworks().length} networks`);
+  console.error(
+    `Supported chains: ${getSupportedChainCount()} (${getSupportedNetworks().length} configured names and aliases)`
+  );
 
   return serveStdio(createServer, {
     legacy: "serve",

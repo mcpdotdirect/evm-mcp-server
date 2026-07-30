@@ -1,9 +1,8 @@
 {
   "name": "@mcpdotdirect/evm-mcp-server",
-  "module": "src/index.ts",
   "type": "module",
   "version": "2.0.4",
-  "description": "MCP server for interacting with EVM-compatible blockchains - supports 25 tools and 10 prompts across 60+ networks",
+  "description": "MCP server with 25 tools and 10 prompts across 55 EVM chains",
   "bin": {
     "evm-mcp-server": "./bin/cli.js"
   },
@@ -29,7 +28,7 @@
     "changelog": "conventional-changelog -p angular -i CHANGELOG.md -s -r 0",
     "changelog:latest": "conventional-changelog -p angular -r 1 > RELEASE_NOTES.md",
     "inspect": "npx @modelcontextprotocol/inspector node build/index.js",
-    "test:mcp": "bun test test/mcp-2026.test.ts"
+    "test:mcp": "bun test test/mcp-2026.test.ts test/auth.test.ts test/http-auth.test.ts"
   },
   "devDependencies": {
     "@types/bun": "latest",
@@ -41,6 +40,7 @@
     "typescript": "^5.8.2"
   },
   "dependencies": {
+    "@modelcontextprotocol/express": "^2.0.0",
     "@modelcontextprotocol/node": "^2.0.0",
     "@modelcontextprotocol/server": "^2.0.0",
     "express": "^5.2.1",

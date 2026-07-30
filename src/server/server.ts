@@ -3,6 +3,7 @@ import { registerEVMResources } from "../core/resources.js";
 import { registerEVMTools } from "../core/tools.js";
 import { registerEVMPrompts } from "../core/prompts.js";
 import { CACHE_SCOPE, CACHE_TTL_MS, SERVER_INFO, SERVER_INSTRUCTIONS } from "./protocol.js";
+import { confirmationRequestStateCodec } from "./request-state.js";
 
 // Create the MCP server used by the stdio and per-request HTTP serving entries.
 function createServer() {
@@ -25,8 +26,10 @@ function createServer() {
         "tools/list": cacheHint,
         "prompts/list": cacheHint,
         "resources/list": cacheHint,
-        "resources/templates/list": cacheHint,
-        "resources/read": cacheHint
+        "resources/templates/list": cacheHint
+      },
+      requestState: {
+        verify: confirmationRequestStateCodec.verify
       }
     }
   );
