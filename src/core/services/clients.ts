@@ -4,8 +4,7 @@ import {
   http, 
   type PublicClient,
   type WalletClient,
-  type Hex,
-  type Address
+  type Hex
 } from 'viem';
 import { privateKeyToAccount } from 'viem/accounts';
 import { getChain, getRpcUrl } from '../chains.js';
@@ -53,13 +52,3 @@ export function getWalletClient(privateKey: Hex, network = 'ethereum'): WalletCl
     transport: http(rpcUrl)
   });
 }
-
-/**
- * Get an Ethereum address from a private key
- * @param privateKey The private key in hex format (with or without 0x prefix)
- * @returns The Ethereum address derived from the private key
- */
-export function getAddressFromPrivateKey(privateKey: Hex): Address {
-  const account = privateKeyToAccount(privateKey);
-  return account.address;
-} 
