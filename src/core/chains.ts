@@ -1,4 +1,4 @@
-import { type Chain } from 'viem';
+import { type Chain, defineChain } from 'viem';
 import {
   // Mainnets
   mainnet,
@@ -60,6 +60,52 @@ import {
   filecoinCalibration
 } from 'viem/chains';
 
+// MegaETH - not yet exported by viem/chains as of viem 2.39.3.
+// Mainnet (id 4326) and testnet (id 6343) per chainid.network / ethereum-lists.
+export const megaeth = defineChain({
+  id: 4326,
+  name: 'MegaETH',
+  nativeCurrency: {
+    name: 'Ether',
+    symbol: 'ETH',
+    decimals: 18,
+  },
+  rpcUrls: {
+    default: {
+      http: ['https://mainnet.megaeth.com/rpc'],
+      webSocket: ['wss://mainnet.megaeth.com/ws'],
+    },
+  },
+  blockExplorers: {
+    default: {
+      name: 'MegaETH Explorer',
+      url: 'https://mega.etherscan.io',
+    },
+  },
+});
+
+export const megaethTestnet = defineChain({
+  id: 6343,
+  name: 'MegaETH Testnet',
+  nativeCurrency: {
+    name: 'Ether',
+    symbol: 'ETH',
+    decimals: 18,
+  },
+  rpcUrls: {
+    default: {
+      http: ['https://carrot.megaeth.com/rpc'],
+    },
+  },
+  blockExplorers: {
+    default: {
+      name: 'MegaETH Testnet Explorer',
+      url: 'https://testnet-mega.etherscan.io',
+    },
+  },
+  testnet: true,
+});
+
 // Default configuration values
 export const DEFAULT_RPC_URL = 'https://eth.llamarpc.com';
 export const DEFAULT_CHAIN_ID = 1;
@@ -98,6 +144,7 @@ export const chainMap: Record<number, Chain> = {
   1313161554: aurora,
   7700: canto,
   747: flowMainnet,
+  4326: megaeth,
   
   // Testnets
   11155111: sepolia,
@@ -124,6 +171,7 @@ export const chainMap: Record<number, Chain> = {
   17000: holesky,
   545: flowTestnet,
   314159: filecoinCalibration,
+  6343: megaethTestnet,
 };
 
 // Map network names to chain IDs for easier reference
@@ -172,6 +220,7 @@ export const networkNameMap: Record<string, number> = {
   'aurora': 1313161554,
   'canto': 7700,
   'flow': 747,
+  'megaeth': 4326,
   
   // Testnets
   'sepolia': 11155111,
@@ -218,6 +267,8 @@ export const networkNameMap: Record<string, number> = {
   'holesky': 17000,
   'flow-testnet': 545,
   'filecoin-calibration': 314159,
+  'megaeth-testnet': 6343,
+  'megaethtestnet': 6343,
 };
 
 // Map chain IDs to RPC URLs
@@ -254,6 +305,7 @@ export const rpcUrlMap: Record<number, string> = {
   1313161554: 'https://mainnet.aurora.dev',
   7700: 'https://canto.gravitychain.io',
   747: 'https://mainnet.evm.nodes.onflow.org',
+  4326: 'https://mainnet.megaeth.com/rpc',
   
   // Testnets
   11155111: 'https://sepolia.drpc.org',
@@ -280,6 +332,7 @@ export const rpcUrlMap: Record<number, string> = {
   17000: 'https://ethereum-holesky.publicnode.com',
   545: 'https://testnet.evm.nodes.onflow.org',
   314159: 'https://api.calibration.node.glif.io/rpc/v1',
+  6343: 'https://carrot.megaeth.com/rpc',
 };
 
 /**
