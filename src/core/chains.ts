@@ -1,4 +1,4 @@
-import { type Chain } from 'viem';
+import { type Chain, defineChain } from 'viem';
 import {
   // Mainnets
   mainnet,
@@ -60,6 +60,51 @@ import {
   filecoinCalibration
 } from 'viem/chains';
 
+// Plasma (XPL) - not yet exported by viem/chains as of viem 2.39.3.
+// Mainnet (id 9745) and testnet (id 9746) per chainid.network / ethereum-lists.
+export const plasma = defineChain({
+  id: 9745,
+  name: 'Plasma',
+  nativeCurrency: {
+    name: 'Plasma',
+    symbol: 'XPL',
+    decimals: 18,
+  },
+  rpcUrls: {
+    default: {
+      http: ['https://rpc.plasma.to'],
+    },
+  },
+  blockExplorers: {
+    default: {
+      name: 'Plasma Explorer',
+      url: 'https://plasmascan.to',
+    },
+  },
+});
+
+export const plasmaTestnet = defineChain({
+  id: 9746,
+  name: 'Plasma Testnet',
+  nativeCurrency: {
+    name: 'Testnet Plasma',
+    symbol: 'XPL',
+    decimals: 18,
+  },
+  rpcUrls: {
+    default: {
+      http: ['https://testnet-rpc.plasma.to'],
+    },
+  },
+  blockExplorers: {
+    default: {
+      name: 'Plasma Testnet Explorer',
+      url: 'https://testnet.plasmascan.to',
+    },
+  },
+  testnet: true,
+});
+
 // Default configuration values
 export const DEFAULT_RPC_URL = 'https://eth.llamarpc.com';
 export const DEFAULT_CHAIN_ID = 1;
@@ -98,6 +143,7 @@ export const chainMap: Record<number, Chain> = {
   1313161554: aurora,
   7700: canto,
   747: flowMainnet,
+  9745: plasma,
   
   // Testnets
   11155111: sepolia,
@@ -124,6 +170,7 @@ export const chainMap: Record<number, Chain> = {
   17000: holesky,
   545: flowTestnet,
   314159: filecoinCalibration,
+  9746: plasmaTestnet,
 };
 
 // Map network names to chain IDs for easier reference
@@ -172,6 +219,7 @@ export const networkNameMap: Record<string, number> = {
   'aurora': 1313161554,
   'canto': 7700,
   'flow': 747,
+  'plasma': 9745,
   
   // Testnets
   'sepolia': 11155111,
@@ -218,6 +266,8 @@ export const networkNameMap: Record<string, number> = {
   'holesky': 17000,
   'flow-testnet': 545,
   'filecoin-calibration': 314159,
+  'plasma-testnet': 9746,
+  'plasmatestnet': 9746,
 };
 
 // Map chain IDs to RPC URLs
@@ -254,6 +304,7 @@ export const rpcUrlMap: Record<number, string> = {
   1313161554: 'https://mainnet.aurora.dev',
   7700: 'https://canto.gravitychain.io',
   747: 'https://mainnet.evm.nodes.onflow.org',
+  9745: 'https://rpc.plasma.to',
   
   // Testnets
   11155111: 'https://sepolia.drpc.org',
@@ -280,6 +331,7 @@ export const rpcUrlMap: Record<number, string> = {
   17000: 'https://ethereum-holesky.publicnode.com',
   545: 'https://testnet.evm.nodes.onflow.org',
   314159: 'https://api.calibration.node.glif.io/rpc/v1',
+  9746: 'https://testnet-rpc.plasma.to',
 };
 
 /**

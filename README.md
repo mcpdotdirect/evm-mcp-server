@@ -144,6 +144,7 @@ All services are exposed through a consistent interface of MCP tools, resources,
 - Canto
 - Flow
 - Lumia
+- Plasma
 
 ### Testnets
 
@@ -171,6 +172,7 @@ All services are exposed through a consistent interface of MCP tools, resources,
 - Flow Testnet
 - Filecoin Calibration
 - Lumia Testnet
+- Plasma Testnet
 
 ## 🛠️ Prerequisites
 
