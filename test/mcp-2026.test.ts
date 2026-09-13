@@ -1,5 +1,6 @@
 import { afterAll, describe, expect, test } from "bun:test";
 import { createMcpHandler, SERVER_INFO_META_KEY } from "@modelcontextprotocol/server";
+import { z } from "zod";
 import {
   getChain,
   getRpcUrl,
@@ -104,6 +105,7 @@ async function modernRequest(
     name?: string;
     protocolVersion?: string;
     meta?: Record<string, unknown>;
+    headers?: Record<string, string>;
     requestHandler?: typeof handler;
   } = {}
 ): Promise<{ status: number; body: JsonRpcResponse }> {
@@ -117,6 +119,9 @@ async function modernRequest(
 
   if (options.name) {
     headers.set("Mcp-Name", options.name);
+  }
+  for (const [name, value] of Object.entries(options.headers ?? {})) {
+    headers.set(name, value);
   }
 
   const response = await (options.requestHandler ?? handler).fetch(new Request("http://test.local/mcp", {
@@ -144,6 +149,48 @@ afterAll(async () => {
 });
 
 describe("MCP 2026-07-28 SDK integration", () => {
+  test("validates annotated parameter headers before invoking a tool", async () => {
+    let calls = 0;
+    const requestHandler = createMcpHandler(() => {
+      const server = createServer();
+      server.registerTool("header_test", {
+        inputSchema: z.object({
+          region: z.string().meta({ "x-mcp-header": "Region" })
+        })
+      }, async ({ region }) => {
+        calls += 1;
+        return { content: [{ type: "text", text: region }] };
+      });
+      return server;
+    }, { legacy: "reject" });
+
+    try {
+      const invalidHeaders: Record<string, string>[] = [
+        {}, { "Mcp-Param-Region": "wrong" }, { "Mcp-Param-Region": "=?base64?%%%?=" }
+      ];
+      for (const headers of invalidHeaders) {
+        const { status, body } = await modernRequest("header-invalid", "tools/call", {
+          name: "header_test", arguments: { region: " padded " }
+        }, { name: "header_test", requestHandler, headers });
+        expect(status).toBe(400);
+        expect(body.error?.code).toBe(-32020);
+        expect(calls).toBe(0);
+      }
+      const { status, body } = await modernRequest("header-valid", "tools/call", {
+        name: "header_test", arguments: { region: " padded " }
+      }, {
+        name: "header_test",
+        requestHandler,
+        headers: { "Mcp-Param-Region": `=?base64?${Buffer.from(" padded ").toString("base64")}?=` }
+      });
+      expect(status).toBe(200);
+      expect(body.result?.content).toEqual([{ type: "text", text: " padded " }]);
+      expect(calls).toBe(1);
+    } finally {
+      await requestHandler.close();
+    }
+  });
+
   test("accepts configured numeric chain identifiers and rejects unknown networks", () => {
     expect(resolveChainId("137")).toBe(137);
     expect(getChain("137").id).toBe(137);

@@ -20,7 +20,7 @@
     "dev": "bun --watch src/index.ts",
     "start:http": "bun run src/server/http-server.ts",
     "dev:http": "bun --watch src/server/http-server.ts",
-    "prepublishOnly": "bun run build && bun run build:http",
+    "prepublishOnly": "bun run check",
     "version:patch": "npm version patch",
     "version:minor": "npm version minor",
     "version:major": "npm version major",
@@ -28,7 +28,9 @@
     "changelog": "conventional-changelog -p angular -i CHANGELOG.md -s -r 0",
     "changelog:latest": "conventional-changelog -p angular -r 1 > RELEASE_NOTES.md",
     "inspect": "npx @modelcontextprotocol/inspector node build/index.js",
-    "test:mcp": "bun test test/mcp-2026.test.ts test/auth.test.ts test/http-auth.test.ts"
+    "typecheck": "tsc --noEmit",
+    "test:mcp": "bun test test",
+    "check": "bun run typecheck && bun run build && bun run build:http && bun run test:mcp"
   },
   "devDependencies": {
     "@modelcontextprotocol/client": "^2.0.0",

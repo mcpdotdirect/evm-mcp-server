@@ -1,6 +1,8 @@
+import packageInfo from "../../package.json" with { type: "json" };
+
 export const SERVER_INFO = {
   name: "evm-mcp-server",
-  version: "2.0.4"
+  version: packageInfo.version
 } as const;
 
 export const MODERN_PROTOCOL_VERSION = "2026-07-28";

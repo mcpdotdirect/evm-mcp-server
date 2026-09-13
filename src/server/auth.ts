@@ -57,7 +57,7 @@ export type OAuthResourceServerConfiguration = {
 };
 
 type OAuthEnvironment = NodeJS.ProcessEnv;
-type FetchImplementation = typeof fetch;
+type FetchImplementation = (input: string | URL | Request, init?: RequestInit) => Promise<Response>;
 
 function requiredEnvironmentValue(
   environment: OAuthEnvironment,

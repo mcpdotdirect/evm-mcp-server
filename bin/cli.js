@@ -23,7 +23,7 @@ try {
   require.resolve(scriptPath);
   
   // Execute the server
-  const server = spawn('node', [scriptPath], {
+  const server = spawn(process.execPath, [scriptPath], {
     stdio: 'inherit',
     shell: false
   });
@@ -31,6 +31,10 @@ try {
   server.on('error', (err) => {
     console.error('Failed to start server:', err);
     process.exit(1);
+  });
+
+  server.on('exit', (code, signal) => {
+    process.exitCode = code ?? (signal ? 1 : 0);
   });
 
   // Handle clean shutdown

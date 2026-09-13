@@ -8,7 +8,8 @@ import {
   bearerAuthChallengeResponse,
   createMcpHandler,
   OAuthError,
-  OAuthErrorCode
+  OAuthErrorCode,
+  ProtocolErrorCode
 } from "@modelcontextprotocol/server";
 import {
   getOAuthProtectedResourceMetadataUrl,
@@ -80,6 +81,32 @@ export function createHttpApp(options: HttpAppOptions): HttpApp {
   };
 
   const handleMcpRequest = (req: Request, res: Response) => {
+    // The v2 entry validates header values but permits an absent version header.
+    if (req.method === "POST" && !req.get("MCP-Protocol-Version")) {
+      res.status(400).json({
+        jsonrpc: "2.0",
+        ...(typeof req.body?.id === "string" || typeof req.body?.id === "number"
+          ? { id: req.body.id } : {}),
+        error: { code: -32020, message: "Missing MCP-Protocol-Version header" }
+      });
+      return;
+    }
+
+    if (req.method === "POST" && (
+      !req.get("Accept")
+      || !req.accepts("application/json")
+      || !req.accepts("text/event-stream")
+    )) {
+      res.status(406).json({
+        jsonrpc: "2.0",
+        error: {
+          code: ProtocolErrorCode.InvalidRequest,
+          message: "Accept must allow application/json and text/event-stream"
+        }
+      });
+      return;
+    }
+
     void nodeHandler(req, res, req.body);
   };
 
@@ -125,7 +152,7 @@ export function createHttpApp(options: HttpAppOptions): HttpApp {
         requiredScopes: oauthConfiguration.requiredScopes,
         resourceMetadataUrl
       }),
-      express.json({ limit: "1mb" }),
+      express.json({ limit: "1mb", strict: false }),
       requireOperationScope,
       handleMcpRequest
     );
@@ -133,10 +160,29 @@ export function createHttpApp(options: HttpAppOptions): HttpApp {
     app.all(
       "/mcp",
       validateMcpRequest,
-      express.json({ limit: "1mb" }),
+      express.json({ limit: "1mb", strict: false }),
       handleMcpRequest
     );
   }
+
+  app.use((error: unknown, _req: Request, res: Response, next: NextFunction) => {
+    const parserError = error as { type?: string } | undefined;
+    if (parserError?.type === "entity.parse.failed") {
+      res.status(400).json({
+        jsonrpc: "2.0",
+        error: { code: ProtocolErrorCode.ParseError, message: "Parse error" }
+      });
+      return;
+    }
+    if (parserError?.type === "entity.too.large") {
+      res.status(413).json({
+        jsonrpc: "2.0",
+        error: { code: ProtocolErrorCode.InvalidRequest, message: "Request body exceeds 1 MB" }
+      });
+      return;
+    }
+    next(error);
+  });
 
   app.get("/health", (_req: Request, res: Response) => {
     res.status(200).json({
