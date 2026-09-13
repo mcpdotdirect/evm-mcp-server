@@ -31,21 +31,20 @@
     "test:mcp": "bun test test/mcp-2026.test.ts test/auth.test.ts test/http-auth.test.ts"
   },
   "devDependencies": {
+    "@modelcontextprotocol/client": "^2.0.0",
     "@types/bun": "latest",
-    "@types/express": "^5.0.0",
-    "@types/node": "^22.0.0",
-    "conventional-changelog-cli": "^5.0.0"
-  },
-  "peerDependencies": {
-    "typescript": "^5.8.2"
+    "@types/express": "^5.0.6",
+    "@types/node": "^22.20.2",
+    "conventional-changelog-cli": "^5.0.0",
+    "typescript": "^5.9.3"
   },
   "dependencies": {
     "@modelcontextprotocol/express": "^2.0.0",
     "@modelcontextprotocol/node": "^2.0.0",
     "@modelcontextprotocol/server": "^2.0.0",
     "express": "^5.2.1",
-    "viem": "^2.55.10",
-    "zod": "^4.2.0"
+    "viem": "^2.56.5",
+    "zod": "^4.6.4"
   },
   "keywords": [
     "mcp",
