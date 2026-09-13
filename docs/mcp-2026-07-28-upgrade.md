@@ -35,6 +35,7 @@ Verified against the registry on September 13, 2026: the server, Node, Express, 
 - Added Host and Origin validation before the HTTP MCP handler.
 - Added application-level enforcement of the protocol-version header and both accepted response types, including `q=0` exclusions. These supplement SDK v2.0.0's header value validation.
 - Return JSON-RPC parse errors for malformed JSON and a JSON error for the 1 MB request limit; syntactically valid non-RPC JSON remains the SDK's responsibility.
+- Reject non-JSON or missing POST media types before reading the body. All accepted bodies pass through Express's 1 MB reader (including chunked and decompressed uploads); the Node adapter always receives a parsed value so its unbounded raw-stream fallback is never used. Unsupported encodings also return JSON-RPC errors.
 - Verified Base64 sentinel decoding for `Mcp-Name` and `x-mcp-header` parameter validation. Current EVM tools do not declare routing headers; an annotated test tool verifies missing, malformed, mismatched, and correctly encoded headers before handler execution.
 - Added MCP OAuth resource-server support for HTTP:
   - localhost can run without authorization
@@ -117,6 +118,7 @@ The automated MCP integration tests cover:
 - resource reads and a read-only tool call
 - final `HeaderMismatch` and `UnsupportedProtocolVersion` error codes
 - real Express HTTP requests covering media types, required headers, Host/Origin rejection, parser errors, removed methods, and the SDK client
+- unfinished uploads proving unsupported media types are rejected before body completion, plus chunked and gzip uploads exceeding the decoded size limit
 - packaged Node CLI clients exercising tools, resource reads, and prompts over modern and legacy stdio, plus startup exit-code propagation
 - local authorization opt-out, remote fail-closed behavior, OAuth metadata validation, RFC 7662 introspection, audience checks, and scopes
 

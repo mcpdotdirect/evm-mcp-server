@@ -7,6 +7,7 @@ import express, {
 import {
   bearerAuthChallengeResponse,
   createMcpHandler,
+  isJsonContentType,
   OAuthError,
   OAuthErrorCode,
   ProtocolErrorCode
@@ -77,8 +78,23 @@ export function createHttpApp(options: HttpAppOptions): HttpApp {
       return;
     }
 
+    if (req.method === "POST" && !isJsonContentType(req.get("Content-Type") ?? null)) {
+      res.status(415).json({
+        jsonrpc: "2.0",
+        error: {
+          code: ProtocolErrorCode.InvalidRequest,
+          message: "Content-Type must be application/json"
+        }
+      });
+      return;
+    }
+
     next();
   };
+
+  // Media types are checked above. Force every remaining body through this
+  // bounded reader, including chunked uploads and decompressed JSON.
+  const parseMcpBody = express.json({ limit: "1mb", strict: false, type: () => true });
 
   const handleMcpRequest = (req: Request, res: Response) => {
     // The v2 entry validates header values but permits an absent version header.
@@ -107,7 +123,9 @@ export function createHttpApp(options: HttpAppOptions): HttpApp {
       return;
     }
 
-    void nodeHandler(req, res, req.body);
+    // An undefined parsedBody makes the SDK buffer the raw stream without a limit.
+    // Treat an absent body as invalid JSON-RPC instead of entering that fallback.
+    void nodeHandler(req, res, req.body ?? null);
   };
 
   if (oauthConfiguration) {
@@ -152,7 +170,7 @@ export function createHttpApp(options: HttpAppOptions): HttpApp {
         requiredScopes: oauthConfiguration.requiredScopes,
         resourceMetadataUrl
       }),
-      express.json({ limit: "1mb", strict: false }),
+      parseMcpBody,
       requireOperationScope,
       handleMcpRequest
     );
@@ -160,13 +178,13 @@ export function createHttpApp(options: HttpAppOptions): HttpApp {
     app.all(
       "/mcp",
       validateMcpRequest,
-      express.json({ limit: "1mb", strict: false }),
+      parseMcpBody,
       handleMcpRequest
     );
   }
 
   app.use((error: unknown, _req: Request, res: Response, next: NextFunction) => {
-    const parserError = error as { type?: string } | undefined;
+    const parserError = error as { type?: string; status?: number } | undefined;
     if (parserError?.type === "entity.parse.failed") {
       res.status(400).json({
         jsonrpc: "2.0",
@@ -178,6 +196,13 @@ export function createHttpApp(options: HttpAppOptions): HttpApp {
       res.status(413).json({
         jsonrpc: "2.0",
         error: { code: ProtocolErrorCode.InvalidRequest, message: "Request body exceeds 1 MB" }
+      });
+      return;
+    }
+    if (parserError?.status === 400 || parserError?.status === 415) {
+      res.status(parserError.status).json({
+        jsonrpc: "2.0",
+        error: { code: ProtocolErrorCode.InvalidRequest, message: "Invalid request body or encoding" }
       });
       return;
     }

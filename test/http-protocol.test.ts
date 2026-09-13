@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import type { Server } from "node:http";
+import { request, type Server } from "node:http";
+import { gzipSync } from "node:zlib";
 import type { AddressInfo } from "node:net";
 import { Client, StreamableHTTPClientTransport } from "@modelcontextprotocol/client";
 import { createHttpApp } from "../src/server/http-app.js";
@@ -65,6 +66,75 @@ function post(options: {
 }
 
 describe("Streamable HTTP protocol boundary", () => {
+  test("rejects unsupported media types before waiting for the request body", async () => {
+    for (const contentType of [undefined, "text/plain", "text/plain; a=application/json"]) {
+      for (const framing of ["length", "chunked"]) {
+        const response = await new Promise<{ status: number; type?: string; body: string }>((resolve, reject) => {
+          const req = request(endpoint, {
+            method: "POST",
+            headers: {
+              "Accept": "application/json, text/event-stream",
+              "MCP-Protocol-Version": MODERN_PROTOCOL_VERSION,
+              "Mcp-Method": "server/discover",
+              ...(contentType ? { "Content-Type": contentType } : {}),
+              ...(framing === "length" ? { "Content-Length": 2 * 1024 * 1024 } : { "Transfer-Encoding": "chunked" })
+            }
+          });
+          const deadline = setTimeout(() => {
+            req.destroy();
+            reject(new Error("Server waited for an unsupported request body"));
+          }, 2000);
+          req.on("error", error => {
+            clearTimeout(deadline);
+            reject(error);
+          });
+          req.on("response", res => {
+            let body = "";
+            res.setEncoding("utf8");
+            res.on("data", chunk => { body += chunk; });
+            res.on("end", () => {
+              clearTimeout(deadline);
+              resolve({ status: res.statusCode!, type: res.headers["content-type"], body });
+              req.destroy();
+            });
+          });
+          // Deliberately leave the upload unfinished: status-only tests miss buffering.
+          req.write("{");
+        });
+        expect(response.status).toBe(415);
+        expect(response.type).toContain("application/json");
+        expect(JSON.parse(response.body).error.code).toBe(-32600);
+      }
+    }
+  }, 15000);
+
+  test("limits chunked and decompressed JSON bodies", async () => {
+    const body = JSON.stringify({ padding: "x".repeat(1100 * 1024) });
+    const chunked = await new Promise<{ status: number; body: string }>((resolve, reject) => {
+      const req = request(endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Transfer-Encoding": "chunked" }
+      }, res => {
+        let responseBody = "";
+        res.setEncoding("utf8");
+        res.on("data", chunk => { responseBody += chunk; });
+        res.on("end", () => resolve({ status: res.statusCode!, body: responseBody }));
+      });
+      req.on("error", reject);
+      req.end(body);
+    });
+    expect(chunked.status).toBe(413);
+    expect(JSON.parse(chunked.body).error.code).toBe(-32600);
+
+    const compressed = await fetch(endpoint, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Content-Encoding": "gzip" },
+      body: gzipSync(body)
+    });
+    expect(compressed.status).toBe(413);
+    expect((await compressed.json() as { error: { code: number } }).error.code).toBe(-32600);
+  });
+
   test("serves an SDK client without protocol sessions", async () => {
     const client = new Client({ name: "http-test", version: "1.0.0" }, {
       versionNegotiation: { mode: { pin: MODERN_PROTOCOL_VERSION } }
@@ -90,6 +160,22 @@ describe("Streamable HTTP protocol boundary", () => {
       jsonrpc: "2.0",
       error: expect.objectContaining({ code: -32700 })
     }));
+  });
+
+  test("returns JSON-RPC errors for empty bodies and unsupported encodings", async () => {
+    const empty = await post({ rawBody: "" });
+    expect(empty.status).toBe(400);
+    expect((await empty.json() as { error: { code: number } }).error.code).toBe(-32600);
+
+    for (const headers of [
+      { "Content-Type": "application/json; charset=iso-8859-1" },
+      { "Content-Encoding": "unsupported" }
+    ] as Record<string, string>[]) {
+      const response = await post({ headers });
+      expect(response.status).toBe(415);
+      expect(response.headers.get("Content-Type")).toContain("application/json");
+      expect((await response.json() as { error: { code: number } }).error.code).toBe(-32600);
+    }
   });
 
   test("rejects non-JSON media types and accepts JSON parameters", async () => {
