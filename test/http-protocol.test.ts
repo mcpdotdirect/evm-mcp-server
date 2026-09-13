@@ -66,6 +66,48 @@ function post(options: {
 }
 
 describe("Streamable HTTP protocol boundary", () => {
+  test("allows constrained browser preflights and exposes response headers", async () => {
+    const origin = "http://127.0.0.1:9876";
+    const preflight = await fetch(endpoint, {
+      method: "OPTIONS",
+      headers: {
+        Origin: origin,
+        "Access-Control-Request-Method": "POST",
+        "Access-Control-Request-Headers": "Content-Type,Authorization,MCP-Protocol-Version,Mcp-Method,Mcp-Name,Mcp-Param-network"
+      }
+    });
+    expect(preflight.status).toBe(204);
+    expect(preflight.headers.get("Access-Control-Allow-Origin")).toBe(origin);
+    expect(preflight.headers.get("Access-Control-Allow-Headers")).toContain("authorization");
+    expect(preflight.headers.get("Access-Control-Allow-Headers")).toContain("mcp-param-network");
+    expect(preflight.headers.get("Vary")).toContain("Origin");
+    expect(preflight.headers.get("Access-Control-Allow-Credentials")).toBeNull();
+    const response = await post({ headers: { Origin: origin } });
+    expect(response.status).toBe(200);
+    expect(response.headers.get("Access-Control-Allow-Origin")).toBe(origin);
+    await response.text();
+  });
+
+  test("rejects unapproved preflight origins, methods and headers", async () => {
+    for (const overrides of [
+      { Origin: "https://attacker.invalid" },
+      { "Access-Control-Request-Method": "DELETE" },
+      { "Access-Control-Request-Headers": "x-unapproved" }
+    ]) {
+      const response = await fetch(endpoint, {
+        method: "OPTIONS",
+        headers: {
+          Origin: "http://127.0.0.1:9876",
+          "Access-Control-Request-Method": "POST",
+          ...overrides
+        } as Record<string, string>
+      });
+      expect(response.status).toBe(403);
+      if (overrides.Origin) expect(response.headers.get("Access-Control-Allow-Origin")).toBeNull();
+      await response.text();
+    }
+  });
+
   test("rejects unsupported media types before waiting for the request body", async () => {
     for (const contentType of [undefined, "text/plain", "text/plain; a=application/json"]) {
       for (const framing of ["length", "chunked"]) {

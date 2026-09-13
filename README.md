@@ -270,6 +270,8 @@ The HTTP server uses the following default configuration:
 
 When binding to a non-local interface, explicitly configure the public hostnames accepted by `MCP_ALLOWED_HOSTS` and `MCP_ALLOWED_ORIGINS`. Values may be hostnames or origin URLs; validation is port-agnostic.
 
+Allowed browser origins receive CORS headers on responses, including OAuth challenges and discovery metadata. Preflight requests are validated before authentication; actual MCP requests still require the configured bearer scopes. CORS permits GET/POST, standard MCP headers, authorization, and annotated `Mcp-Param-*` headers. Cookies are not enabled.
+
 #### HTTP OAuth
 
 The HTTP process is an OAuth resource server; it does not issue access tokens. OAuth is optional only when `MCP_HOST` is local (`127.0.0.1`, `localhost`, or `::1`). If `MCP_OAUTH_ISSUER_URL` is set, OAuth is enabled even for a local bind. A non-local bind fails during startup unless OAuth is fully configured.
@@ -350,6 +352,8 @@ bun dev:http
 ### Connecting to the Server
 
 Connect to this MCP server using any MCP-compatible client. For testing and debugging, you can use the [MCP Inspector](https://github.com/modelcontextprotocol/inspector).
+
+Run `bun run inspect` for the Inspector UI, or `bun run inspect:check` for strict tool-schema checks. Both build the stdio server and use `mcp-inspector.json` with explicit modern protocol negotiation. Inspector requires Node >=22.19.0 and is pinned to the verified 2.5.0 release. To inspect HTTP, start `bun run start:http` separately and select `evm-http`; adjust the config URL if using a different port.
 
 ### Connecting from Cursor
 
@@ -575,6 +579,8 @@ The following wallet-backed tools enforce confirmation through MCP multi-round-t
 - `sign_typed_data`
 
 The first invocation describes the exact operation and requests a boolean `confirm` input. No wallet action occurs until the client returns an accepted response with `confirm: true`; declining or cancelling terminates the operation. Clients should display this protocol-level request instead of adding a separate conversational confirmation.
+
+Amounts must be non-negative decimal strings exactly representable in the asset's base units; excess nonzero decimal places are rejected before confirmation. Token precision is read before each confirmation round, and the confirmation binds both decimals and the exact base-unit amount. A precision change requires fresh confirmation. Execution uses the confirmed base units without another decimals lookup.
 
 Confirmation continuation state is HMAC integrity-protected and binds the complete tool arguments. It expires after five minutes, is process-local and single-use, and is also bound to the authenticated bearer token for HTTP requests. An expired, replayed, cross-process, or differently authenticated continuation requires a new confirmation.
 

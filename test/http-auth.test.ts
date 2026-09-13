@@ -149,6 +149,39 @@ afterAll(async () => {
 });
 
 describe("HTTP OAuth middleware integration", () => {
+  test("serves browser preflights before auth and exposes OAuth challenges and metadata", async () => {
+    const origin = "http://127.0.0.1:9876";
+    const preflight = await fetch(`${baseUrl}/mcp`, {
+      method: "OPTIONS",
+      headers: {
+        Origin: origin,
+        "Access-Control-Request-Method": "POST",
+        "Access-Control-Request-Headers": "authorization,content-type,mcp-protocol-version,mcp-method"
+      }
+    });
+    expect(preflight.status).toBe(204);
+    expect(preflight.headers.get("Access-Control-Allow-Origin")).toBe(origin);
+
+    const headers = mcpHeaders();
+    headers.set("Origin", origin);
+    const unauthorized = await fetch(`${baseUrl}/mcp`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify(mcpRequest("browser-auth", "tools/list"))
+    });
+    expect(unauthorized.status).toBe(401);
+    expect(unauthorized.headers.get("Access-Control-Allow-Origin")).toBe(origin);
+    expect(unauthorized.headers.get("Access-Control-Expose-Headers")).toContain("WWW-Authenticate");
+    expect(unauthorized.headers.get("WWW-Authenticate")).toContain("resource_metadata");
+    await unauthorized.text();
+
+    const metadata = await fetch(`${baseUrl}${LOCAL_RESOURCE_METADATA_PATH}`, { headers: { Origin: origin } });
+    expect(metadata.status).toBe(200);
+    // The SDK intentionally publishes public OAuth metadata with wildcard CORS.
+    expect(metadata.headers.get("Access-Control-Allow-Origin")).toBe("*");
+    await metadata.text();
+  });
+
   test("serves public protected-resource metadata for the exact MCP resource", async () => {
     const response = await fetch(`${baseUrl}${LOCAL_RESOURCE_METADATA_PATH}`);
 

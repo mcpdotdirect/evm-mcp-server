@@ -1,5 +1,4 @@
 import { 
-  parseEther,
   parseUnits,
   type Address, 
   type Hash, 
@@ -47,6 +46,45 @@ const erc20TransferAbi = [
   }
 ] as const;
 
+/** Parse a non-negative amount without rounding away fractional base units. */
+export function parseExactAmount(amount: string, decimals: number): bigint {
+  if (!/^\d+(\.\d+)?$/.test(amount)) {
+    throw new Error('Amount must be a non-negative decimal string');
+  }
+  if (!Number.isInteger(decimals) || decimals < 0 || decimals > 255) {
+    throw new Error('Invalid token decimals');
+  }
+  const fraction = (amount.split('.')[1] ?? '').replace(/0+$/, '');
+  if (fraction.length > decimals) {
+    throw new Error(`Amount exceeds ${decimals} decimal places; rounding is not allowed`);
+  }
+  const raw = parseUnits(amount, decimals);
+  if (raw >= 2n ** 256n) {
+    throw new Error('Amount exceeds uint256');
+  }
+  return raw;
+}
+
+export type TokenAmount = {
+  raw: bigint;
+  formatted: string;
+  decimals: number;
+};
+
+/** Resolve token precision before confirmation and retain the exact execution amount. */
+export async function prepareERC20Amount(
+  tokenAddress: Address,
+  amount: string,
+  network = 'ethereum'
+): Promise<TokenAmount> {
+  const decimals = await getPublicClient(network).readContract({
+    address: tokenAddress,
+    abi: erc20TransferAbi,
+    functionName: 'decimals'
+  });
+  return { raw: parseExactAmount(amount, decimals), formatted: amount, decimals };
+}
+
 /**
  * Transfer a chain's native token to an address
  * @param privateKey Sender's private key
@@ -70,7 +108,7 @@ export async function transferETH(
     : privateKey as Hex;
   
   const client = getWalletClient(formattedKey, network);
-  const amountWei = parseEther(amount);
+  const amountWei = parseExactAmount(amount, 18);
   
   return client.sendTransaction({
     to: toAddress,
@@ -84,7 +122,7 @@ export async function transferETH(
  * Transfer ERC20 tokens to an address
  * @param tokenAddressOrEns Token contract address or ENS name
  * @param toAddressOrEns Recipient address or ENS name
- * @param amount Amount to send (in token units)
+ * @param amount Exact token amount prepared before confirmation
  * @param privateKey Sender's private key
  * @param network Network name or chain ID
  * @returns Transaction details
@@ -92,7 +130,7 @@ export async function transferETH(
 export async function transferERC20(
   tokenAddressOrEns: string,
   toAddressOrEns: string,
-  amount: string,
+  amount: TokenAmount,
   privateKey: string | `0x${string}`,
   network: string = 'ethereum'
 ): Promise<{
@@ -123,12 +161,12 @@ export async function transferERC20(
     client: publicClient,
   });
   
-  // Get token decimals and symbol
-  const decimals = await contract.read.decimals();
+  // Preserve the precision and base units that were confirmed.
+  const decimals = amount.decimals;
   const symbol = await contract.read.symbol();
   
-  // Parse the amount with the correct number of decimals
-  const rawAmount = parseUnits(amount, decimals);
+  // Use the exact base units prepared before confirmation.
+  const rawAmount = amount.raw;
   
   // Create wallet client for sending the transaction
   const walletClient = getWalletClient(formattedKey, network);
@@ -147,7 +185,7 @@ export async function transferERC20(
     txHash: hash,
     amount: {
       raw: rawAmount,
-      formatted: amount
+      formatted: amount.formatted
     },
     token: {
       symbol,
@@ -160,7 +198,7 @@ export async function transferERC20(
  * Approve ERC20 token spending
  * @param tokenAddressOrEns Token contract address or ENS name
  * @param spenderAddressOrEns Spender address or ENS name
- * @param amount Amount to approve (in token units)
+ * @param amount Exact token amount prepared before confirmation
  * @param privateKey Owner's private key
  * @param network Network name or chain ID
  * @returns Transaction hash
@@ -168,7 +206,7 @@ export async function transferERC20(
 export async function approveERC20(
   tokenAddressOrEns: string,
   spenderAddressOrEns: string,
-  amount: string,
+  amount: TokenAmount,
   privateKey: string | `0x${string}`,
   network: string = 'ethereum'
 ): Promise<Hash> {
@@ -181,19 +219,8 @@ export async function approveERC20(
     ? `0x${privateKey}` as `0x${string}`
     : privateKey as `0x${string}`;
   
-  // Get token details
-  const publicClient = getPublicClient(network);
-  const contract = getContract({
-    address: tokenAddress,
-    abi: erc20TransferAbi,
-    client: publicClient,
-  });
-  
-  // Get token decimals
-  const decimals = await contract.read.decimals();
-  
-  // Parse the amount with the correct number of decimals
-  const rawAmount = parseUnits(amount, decimals);
+  // Use the base units bound to the accepted confirmation, without re-reading decimals.
+  const rawAmount = amount.raw;
   
   // Create wallet client for sending the transaction
   const walletClient = getWalletClient(formattedKey, network);

@@ -46,7 +46,11 @@ const supportedNetworksOutputSchema = z.object({
 const gasPriceOutputSchema = z.object({
   network: z.string(),
   gasPricePerGas: z.string(),
-  priorityFeePerGas: z.string().nullable(),
+  // Branch descriptions preserve anyOf instead of Zod's compact type array.
+  priorityFeePerGas: z.union([
+    z.string().describe("Estimated priority fee in wei."),
+    z.null().describe("The network does not provide a priority fee estimate.")
+  ]),
   currency: z.literal("wei")
 });
 
@@ -1105,6 +1109,7 @@ export function registerEVMTools(server: McpServer) {
           };
         }
 
+        const valueWei = value === undefined ? undefined : services.parseExactAmount(value, 18);
         const functionSignature = `${functionAbi.name}(${
           (functionAbi.inputs ?? [])
             .map((input: { type?: unknown }) => String(input.type ?? "unknown"))
@@ -1118,6 +1123,7 @@ export function registerEVMTools(server: McpServer) {
             functionName,
             args,
             value: value ?? null,
+            valueWei: valueWei?.toString() ?? null,
             abiJson: abiJson ?? null,
             functionAbi,
             network
@@ -1140,9 +1146,8 @@ export function registerEVMTools(server: McpServer) {
         };
 
         // Add value if provided (for payable functions)
-        if (value) {
-          const { parseEther } = await import('viem');
-          writeParams.value = parseEther(value);
+        if (valueWei !== undefined) {
+          writeParams.value = valueWei;
         }
 
         // Execute the write operation
@@ -1312,11 +1317,12 @@ export function registerEVMTools(server: McpServer) {
     },
     async ({ to, amount, network = "ethereum" }, ctx) => {
       try {
+        const amountWei = services.parseExactAmount(amount, 18);
         const resolvedRecipient = await services.resolveAddress(to, network);
         const confirmation = await requireConfirmation(
           ctx,
           "transfer_native",
-          { to, resolvedRecipient, amount, network },
+          { to, resolvedRecipient, amount, amountWei: amountWei.toString(), network },
           `Transfer ${amount} native tokens to ${to} (${resolvedRecipient}) on ${network}?`
         );
         if (confirmation) {
@@ -1368,6 +1374,7 @@ export function registerEVMTools(server: McpServer) {
           services.resolveAddress(tokenAddress, network),
           services.resolveAddress(to, network)
         ]);
+        const tokenAmount = await services.prepareERC20Amount(resolvedTokenAddress, amount, network);
         const confirmation = await requireConfirmation(
           ctx,
           "transfer_erc20",
@@ -1377,9 +1384,11 @@ export function registerEVMTools(server: McpServer) {
             to,
             resolvedRecipient,
             amount,
+            rawAmount: tokenAmount.raw.toString(),
+            decimals: tokenAmount.decimals,
             network
           },
-          `Transfer ${amount} of token ${tokenAddress} (${resolvedTokenAddress}) to ${to} (${resolvedRecipient}) on ${network}?`
+          `Transfer ${amount} of token ${tokenAddress} (${resolvedTokenAddress}) to ${to} (${resolvedRecipient}) on ${network} (${tokenAmount.raw} base units at ${tokenAmount.decimals} decimals)?`
         );
         if (confirmation) {
           return confirmation;
@@ -1390,7 +1399,7 @@ export function registerEVMTools(server: McpServer) {
         const result = await services.transferERC20(
           resolvedTokenAddress,
           resolvedRecipient,
-          amount,
+          tokenAmount,
           privateKey,
           network
         );
@@ -1439,6 +1448,7 @@ export function registerEVMTools(server: McpServer) {
           services.resolveAddress(tokenAddress, network),
           services.resolveAddress(spenderAddress, network)
         ]);
+        const tokenAmount = await services.prepareERC20Amount(resolvedTokenAddress, amount, network);
         const confirmation = await requireConfirmation(
           ctx,
           "approve_token_spending",
@@ -1448,9 +1458,11 @@ export function registerEVMTools(server: McpServer) {
             spenderAddress,
             resolvedSpenderAddress,
             amount,
+            rawAmount: tokenAmount.raw.toString(),
+            decimals: tokenAmount.decimals,
             network
           },
-          `Approve ${spenderAddress} (${resolvedSpenderAddress}) to spend ${amount} of token ${tokenAddress} (${resolvedTokenAddress}) on ${network}?`
+          `Approve ${spenderAddress} (${resolvedSpenderAddress}) to spend ${amount} of token ${tokenAddress} (${resolvedTokenAddress}) on ${network} (${tokenAmount.raw} base units at ${tokenAmount.decimals} decimals)?`
         );
         if (confirmation) {
           return confirmation;
@@ -1461,7 +1473,7 @@ export function registerEVMTools(server: McpServer) {
         const txHash = await services.approveERC20(
           resolvedTokenAddress,
           resolvedSpenderAddress,
-          amount,
+          tokenAmount,
           privateKey,
           network
         );

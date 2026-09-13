@@ -60,6 +60,47 @@ export function createHttpApp(options: HttpAppOptions): HttpApp {
     }
   });
 
+  // Browser preflights do not carry bearer tokens. Validate their host/origin
+  // before answering, and retain CORS headers on OAuth challenges and metadata.
+  app.use((req: Request, res: Response, next: NextFunction) => {
+    if (!validateHost(req, res) || !validateOrigin(req, res)) {
+      return;
+    }
+    res.vary("Origin");
+    const origin = req.get("Origin");
+    if (!origin) {
+      next();
+      return;
+    }
+    res.setHeader("Access-Control-Allow-Origin", origin);
+    res.setHeader("Access-Control-Expose-Headers", "WWW-Authenticate, Retry-After, MCP-Protocol-Version");
+    if (req.method !== "OPTIONS") {
+      next();
+      return;
+    }
+
+    res.vary("Access-Control-Request-Method");
+    res.vary("Access-Control-Request-Headers");
+    const method = req.get("Access-Control-Request-Method");
+    const headers = (req.get("Access-Control-Request-Headers") ?? "")
+      .split(",").map(header => header.trim().toLowerCase()).filter(Boolean);
+    const allowedHeaders = new Set([
+      "accept", "content-type", "authorization", "mcp-protocol-version", "mcp-method", "mcp-name"
+    ]);
+    if (
+      !method || !["GET", "POST"].includes(method)
+      || headers.some(header => !allowedHeaders.has(header) && !/^mcp-param-[a-z0-9-]+$/.test(header))
+    ) {
+      res.status(403).end();
+      return;
+    }
+    res.setHeader("Access-Control-Allow-Methods", "GET, POST");
+    if (headers.length) {
+      res.setHeader("Access-Control-Allow-Headers", headers.join(", "));
+    }
+    res.status(204).end();
+  });
+
   if (oauthConfiguration) {
     app.use(mcpAuthMetadataRouter({
       oauthMetadata: oauthConfiguration.oauthMetadata,
@@ -74,10 +115,6 @@ export function createHttpApp(options: HttpAppOptions): HttpApp {
     res: Response,
     next: NextFunction
   ) => {
-    if (!validateHost(req, res) || !validateOrigin(req, res)) {
-      return;
-    }
-
     if (req.method === "POST" && !isJsonContentType(req.get("Content-Type") ?? null)) {
       res.status(415).json({
         jsonrpc: "2.0",

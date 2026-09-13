@@ -1,4 +1,4 @@
-import { afterAll, describe, expect, test } from "bun:test";
+import { afterAll, describe, expect, spyOn, test } from "bun:test";
 import { createMcpHandler, SERVER_INFO_META_KEY } from "@modelcontextprotocol/server";
 import { z } from "zod";
 import {
@@ -8,6 +8,7 @@ import {
   resolveChainId
 } from "../src/core/chains.js";
 import createServer from "../src/server/server.js";
+import { getPublicClient } from "../src/core/services/clients.js";
 import { CACHE_SCOPE, CACHE_TTL_MS, MODERN_PROTOCOL_VERSION, SERVER_INFO } from "../src/server/protocol.js";
 
 const handler = createMcpHandler(createServer, {
@@ -419,71 +420,124 @@ describe("MCP 2026-07-28 SDK integration", () => {
   });
 
   test("requests confirmation before every wallet-backed operation and handles decline", async () => {
-    for (const [index, tool] of DANGEROUS_TOOL_CALLS.entries()) {
-      const { status, body } = await modernRequest(
-        `confirmation-${index}`,
-        "tools/call",
-        {
-          name: tool.name,
-          arguments: tool.arguments
-        },
-        {
-          name: tool.name,
-          meta: ELICITATION_CLIENT_META
-        }
-      );
-
-      expect(status).toBe(200);
-      expect(body.result?.resultType).toBe("input_required");
-      expect(body.result?.requestState).toEqual(expect.any(String));
-
-      const inputRequests = body.result?.inputRequests as Record<string, Record<string, unknown>>;
-      const entries = Object.entries(inputRequests);
-      expect(entries).toHaveLength(1);
-
-      const [confirmationKey, inputRequest] = entries[0];
-      expect(inputRequest).toEqual(expect.objectContaining({
-        method: "elicitation/create",
-        params: expect.objectContaining({
-          mode: "form",
-          message: expect.any(String),
-          requestedSchema: expect.objectContaining({
-            "$schema": "https://json-schema.org/draft/2020-12/schema",
-            type: "object",
-            properties: {
-              confirm: expect.objectContaining({
-                type: "boolean"
-              })
-            },
-            required: ["confirm"]
-          })
-        })
-      }));
-
-      const { status: declinedStatus, body: declinedBody } = await modernRequest(
-        `confirmation-${index}-declined`,
-        "tools/call",
-        {
-          name: tool.name,
-          arguments: tool.arguments,
-          inputResponses: {
-            [confirmationKey]: {
-              action: "decline"
-            }
+    const decimals = spyOn(getPublicClient(), "readContract").mockResolvedValue(6);
+    try {
+      for (const [index, tool] of DANGEROUS_TOOL_CALLS.entries()) {
+        const { status, body } = await modernRequest(
+          `confirmation-${index}`,
+          "tools/call",
+          {
+            name: tool.name,
+            arguments: tool.arguments
           },
-          requestState: body.result?.requestState
-        },
-        {
-          name: tool.name,
-          meta: ELICITATION_CLIENT_META
-        }
-      );
+          {
+            name: tool.name,
+            meta: ELICITATION_CLIENT_META
+          }
+        );
 
-      expect(declinedStatus).toBe(200);
-      expect(declinedBody.result?.resultType).toBe("complete");
-      expect(declinedBody.result?.isError).toBe(true);
-      const declinedContent = declinedBody.result?.content as Array<Record<string, unknown>>;
-      expect(declinedContent[0]?.text).toMatch(/cancel|declin|not confirmed/i);
+        expect(status).toBe(200);
+        expect(body.result?.resultType).toBe("input_required");
+        expect(body.result?.requestState).toEqual(expect.any(String));
+
+        const inputRequests = body.result?.inputRequests as Record<string, Record<string, unknown>>;
+        const entries = Object.entries(inputRequests);
+        expect(entries).toHaveLength(1);
+
+        const [confirmationKey, inputRequest] = entries[0];
+        expect(inputRequest).toEqual(expect.objectContaining({
+          method: "elicitation/create",
+          params: expect.objectContaining({
+            mode: "form",
+            message: expect.any(String),
+            requestedSchema: expect.objectContaining({
+              "$schema": "https://json-schema.org/draft/2020-12/schema",
+              type: "object",
+              properties: {
+                confirm: expect.objectContaining({
+                  type: "boolean"
+                })
+              },
+              required: ["confirm"]
+            })
+          })
+        }));
+
+        const { status: declinedStatus, body: declinedBody } = await modernRequest(
+          `confirmation-${index}-declined`,
+          "tools/call",
+          {
+            name: tool.name,
+            arguments: tool.arguments,
+            inputResponses: {
+              [confirmationKey]: {
+                action: "decline"
+              }
+            },
+            requestState: body.result?.requestState
+          },
+          {
+            name: tool.name,
+            meta: ELICITATION_CLIENT_META
+          }
+        );
+
+        expect(declinedStatus).toBe(200);
+        expect(declinedBody.result?.resultType).toBe("complete");
+        expect(declinedBody.result?.isError).toBe(true);
+        const declinedContent = declinedBody.result?.content as Array<Record<string, unknown>>;
+        expect(declinedContent[0]?.text).toMatch(/cancel|declin|not confirmed/i);
+      }
+    } finally {
+      decimals.mockRestore();
+    }
+  });
+
+  test("rejects non-representable amounts before requesting confirmation", async () => {
+    const decimals = spyOn(getPublicClient(), "readContract").mockResolvedValue(6);
+    try {
+      const calls = [
+        { ...DANGEROUS_TOOL_CALLS[0], arguments: { ...DANGEROUS_TOOL_CALLS[0].arguments, value: "0.0000000000000000006" } },
+        { ...DANGEROUS_TOOL_CALLS[1], arguments: { ...DANGEROUS_TOOL_CALLS[1].arguments, amount: "0.0000000000000000006" } },
+        ...DANGEROUS_TOOL_CALLS.slice(2, 4).map(tool => ({
+          ...tool, arguments: { ...tool.arguments, amount: "0.0000006" }
+        }))
+      ];
+      for (const tool of calls) {
+        const { body } = await modernRequest("invalid-amount", "tools/call", tool, {
+          name: tool.name, meta: ELICITATION_CLIENT_META
+        });
+        expect(body.result?.isError).toBe(true);
+        expect(body.result?.requestState).toBeUndefined();
+        expect(body.result?.content).toEqual(expect.arrayContaining([
+          expect.objectContaining({ text: expect.stringContaining("rounding is not allowed") })
+        ]));
+      }
+    } finally {
+      decimals.mockRestore();
+    }
+  });
+
+  test("requires fresh confirmation when token decimals change", async () => {
+    const decimals = spyOn(getPublicClient(), "readContract");
+    try {
+      for (const tool of DANGEROUS_TOOL_CALLS.slice(2, 4)) {
+        decimals.mockResolvedValue(6);
+        const { body: first } = await modernRequest("precision-first", "tools/call", tool, {
+          name: tool.name, meta: ELICITATION_CLIENT_META
+        });
+        expect(first.result?.resultType).toBe("input_required");
+        decimals.mockResolvedValue(7);
+        const { body: changed } = await modernRequest("precision-changed", "tools/call", {
+          ...tool,
+          requestState: first.result?.requestState,
+          inputResponses: { confirmation: { action: "accept", content: { confirm: true } } }
+        }, { name: tool.name, meta: ELICITATION_CLIENT_META });
+        expect(changed.result?.resultType).toBe("input_required");
+        expect(changed.result?.requestState).not.toBe(first.result?.requestState);
+      }
+    } finally {
+      decimals.mockRestore();
     }
   });
 

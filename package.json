@@ -27,7 +27,8 @@
     "release": "npm publish",
     "changelog": "conventional-changelog -p angular -i CHANGELOG.md -s -r 0",
     "changelog:latest": "conventional-changelog -p angular -r 1 > RELEASE_NOTES.md",
-    "inspect": "npx @modelcontextprotocol/inspector node build/index.js",
+    "inspect": "bun run build && npx -y @modelcontextprotocol/inspector@2.5.0 --config mcp-inspector.json",
+    "inspect:check": "bun run build && npx -y @modelcontextprotocol/inspector@2.5.0 --cli --config mcp-inspector.json --server evm-stdio --method tools/list --strict",
     "typecheck": "tsc --noEmit",
     "test:mcp": "bun test test",
     "check": "bun run typecheck && bun run build && bun run build:http && bun run test:mcp"
