@@ -9,6 +9,10 @@ This repository targets the final MCP `2026-07-28` specification through the rel
 - SDK v1-to-v2 migration: https://github.com/modelcontextprotocol/typescript-sdk/blob/main/docs/migration/upgrade-to-v2.md
 - SDK `2026-07-28` support: https://github.com/modelcontextprotocol/typescript-sdk/blob/main/docs/migration/support-2026-07-28.md
 
+## Dependency Baseline
+
+Verified against the registry on September 13, 2026: the server, Node, Express, and test-client MCP packages are on stable `2.0.0`. Runtime dependencies include Express `5.2.1`, viem `2.56.5`, and Zod `4.6.4`; `bun.lock` pins the complete dependency graph. TypeScript `5.9.3` is a development dependency, not a peer requirement for consumers of the compiled CLI. Node types stay on the existing 22.x line rather than introducing Node 26-only APIs. The migration does not require the TypeScript 7 major upgrade.
+
 ## Final Alignment
 
 - Replaced `@modelcontextprotocol/sdk` v1 with:
@@ -29,6 +33,9 @@ This repository targets the final MCP `2026-07-28` specification through the rel
   - `Mcp-Method`
   - `Mcp-Name`
 - Added Host and Origin validation before the HTTP MCP handler.
+- Added application-level enforcement of the protocol-version header and both accepted response types, including `q=0` exclusions. These supplement SDK v2.0.0's header value validation.
+- Return JSON-RPC parse errors for malformed JSON and a JSON error for the 1 MB request limit; syntactically valid non-RPC JSON remains the SDK's responsibility.
+- Verified Base64 sentinel decoding for `Mcp-Name` and `x-mcp-header` parameter validation. Current EVM tools do not declare routing headers; an annotated test tool verifies missing, malformed, mismatched, and correctly encoded headers before handler execution.
 - Added MCP OAuth resource-server support for HTTP:
   - localhost can run without authorization
   - non-local binds fail closed unless OAuth is configured
@@ -52,6 +59,7 @@ This repository targets the final MCP `2026-07-28` specification through the rel
   - rejects tampering, argument changes, cross-token use, and replay
 - Bounded `wait_for_transaction` with `timeoutSeconds` from 1 through 90, defaulting to 90 seconds so it returns before the 120-second HTTP transport timeout.
 - Kept process diagnostics on `stderr`, including the npm CLI startup line, so stdio `stdout` contains protocol messages only.
+- The CLI uses its parent Node executable and propagates child startup failures. Server identity reads the package version at build time so version bumps update both entry points.
 
 ## Final-Spec Differences from the RC
 
@@ -108,16 +116,20 @@ The automated MCP integration tests cover:
 - cache hints on discovery, list, and resource results
 - resource reads and a read-only tool call
 - final `HeaderMismatch` and `UnsupportedProtocolVersion` error codes
+- real Express HTTP requests covering media types, required headers, Host/Origin rejection, parser errors, removed methods, and the SDK client
+- packaged Node CLI clients exercising tools, resource reads, and prompts over modern and legacy stdio, plus startup exit-code propagation
 - local authorization opt-out, remote fail-closed behavior, OAuth metadata validation, RFC 7662 introspection, audience checks, and scopes
 
 Release checks:
 
 ```bash
-bunx tsc --noEmit
-bun run test:mcp
-bun run build
-bun run build:http
+bun install --frozen-lockfile
+bun run check
+bun audit
+npm pack --dry-run --ignore-scripts
 ```
+
+`bun run check` type-checks source and tests, builds both entry points, then runs the complete test suite (including the built CLI). `bun run test:mcp` runs the suite against existing build output. Tests use localhost listeners and fixture credentials; they do not submit blockchain transactions. CI runs the checks with Node 20, 22, 24, and 26 and Bun 1.4.2. The manual release workflow uses Node 24, verifies the bumped package before committing, and pushes the commit and new tag atomically without rewriting existing tags or branches. No npm release is triggered by a normal branch push.
 
 ## Follow-up Work
 

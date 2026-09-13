@@ -26,6 +26,10 @@ on:
         default: 'latest'
         type: string
 
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   release-and-publish:
     runs-on: ubuntu-latest
@@ -35,24 +39,24 @@ jobs:
       id-token: write
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
           token: ${{ secrets.PAT_GITHUB }}
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
-          node-version: '18.x'
+          node-version: '24.x'
           registry-url: 'https://registry.npmjs.org'
 
       - name: Setup Bun
-        uses: oven-sh/setup-bun@v1
+        uses: oven-sh/setup-bun@v2
         with:
-          bun-version: latest
+          bun-version: '1.4.2'
 
       - name: Install dependencies
-        run: bun install
+        run: bun install --frozen-lockfile
 
       - name: Configure Git
         run: |
@@ -62,42 +66,32 @@ jobs:
 
       - name: Bump version
         id: bump_version
+        env:
+          CUSTOM_VERSION: ${{ inputs.custom_version }}
+          VERSION_TYPE: ${{ inputs.version_type }}
         run: |
-          if [ -n "${{ github.event.inputs.custom_version }}" ]; then
-            echo "Using custom version ${{ github.event.inputs.custom_version }}"
-            npm version ${{ github.event.inputs.custom_version }} --no-git-tag-version
-            echo "VERSION=${{ github.event.inputs.custom_version }}" >> $GITHUB_ENV
-          else
-            echo "Bumping ${{ github.event.inputs.version_type }} version"
-            NEW_VERSION=$(npm version ${{ github.event.inputs.version_type }} --no-git-tag-version)
-            echo "VERSION=${NEW_VERSION:1}" >> $GITHUB_ENV
-          fi
-          echo "New version: ${{ env.VERSION }}"
+          npm version "${CUSTOM_VERSION:-$VERSION_TYPE}" --no-git-tag-version
+          VERSION=$(node -p "JSON.parse(require('fs').readFileSync('package.json', 'utf8')).version")
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+          bun install --lockfile-only
 
       - name: Generate Changelog
         run: |
           npm run changelog
           npm run changelog:latest
 
-      - name: Build project
-        run: bun run build && bun run build:http
+      - name: Check types, build and test before release
+        run: bun run check
 
-      - name: Commit and push changes
+      - name: Commit and tag the verified release
         run: |
-          git pull origin main --no-edit
-          git add package.json CHANGELOG.md
-          git commit -m "Bump version to v${{ env.VERSION }}"
-          git push --force-with-lease
-
-      - name: Create and push tag
-        run: |
-          git tag -d "v${{ env.VERSION }}" 2>/dev/null || true
-          git push origin --delete "v${{ env.VERSION }}" 2>/dev/null || true
-          git tag -a "v${{ env.VERSION }}" -m "Release v${{ env.VERSION }}"
-          git push origin "v${{ env.VERSION }}"
+          git add package.json bun.lock CHANGELOG.md
+          git commit -m "chore: release v$VERSION"
+          git tag -a "v$VERSION" -m "Release v$VERSION"
+          git push --atomic origin "HEAD:refs/heads/$GITHUB_REF_NAME" "refs/tags/v$VERSION"
 
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: v${{ env.VERSION }}
           name: Release v${{ env.VERSION }}
@@ -107,7 +101,8 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.PAT_GITHUB }}
 
       - name: Publish to npm
-        run: npm publish --access public --provenance --tag ${{ github.event.inputs.dist_tag || 'latest' }}
+        run: npm publish --ignore-scripts --access public --provenance --tag "$DIST_TAG"
         env:
+          DIST_TAG: ${{ inputs.dist_tag || 'latest' }}
           # Restored the token here to ensure it works
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

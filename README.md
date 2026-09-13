@@ -175,7 +175,7 @@ All services are exposed through a consistent interface of MCP tools, resources,
 
 ## 🛠️ Prerequisites
 
-- [Bun](https://bun.sh/) 1.0.0 or higher (recommended)
+- [Bun](https://bun.sh/) 1.4.2 (the version used by CI)
 - Node.js 20.0.0 or higher (if not using Bun)
 - Optional: [Etherscan API key](https://etherscan.io/apis) for ABI fetching
 
@@ -187,7 +187,7 @@ git clone https://github.com/mcpdotdirect/evm-mcp-server.git
 cd evm-mcp-server
 
 # Install dependencies with Bun
-bun install
+bun install --frozen-lockfile
 
 # Or with npm
 npm install
@@ -746,6 +746,15 @@ evm-mcp-server/
 ```
 
 ## 🛠️ Development
+
+Run the complete migration checks before committing or publishing:
+
+```bash
+bun install --frozen-lockfile
+bun run check
+```
+
+This type-checks source and tests, builds both Node entry points, and runs the HTTP, OAuth, and modern/legacy stdio integration tests. Tests use local fixtures and do not submit blockchain transactions. CI runs the checks across Node 20, 22, 24, and 26. See [the migration notes](docs/mcp-2026-07-28-upgrade.md) for protocol decisions and dependency versions.
 
 To modify or extend the server:
 
