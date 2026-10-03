@@ -1,0 +1,15 @@
+{
+  "mcpServers": {
+    "evm-stdio": {
+      "type": "stdio",
+      "command": "node",
+      "args": ["bin/cli.js"],
+      "protocolEra": "modern"
+    },
+    "evm-http": {
+      "type": "streamable-http",
+      "url": "http://127.0.0.1:3001/mcp",
+      "protocolEra": "modern"
+    }
+  }
+}

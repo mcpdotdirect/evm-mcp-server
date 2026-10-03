@@ -1,5 +1,6 @@
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { McpServer } from "@modelcontextprotocol/server";
 import { getSupportedNetworks } from "./chains.js";
+import { CACHE_SCOPE, CACHE_TTL_MS } from "../server/protocol.js";
 
 /**
  * Register EVM-related resources with the MCP server
@@ -17,13 +18,21 @@ export function registerEVMResources(server: McpServer) {
   server.registerResource(
     "supported_networks",
     "evm://networks",
-    { description: "Get list of all supported EVM networks and their configuration", mimeType: "application/json" },
+    {
+      description: "Get the configured names and aliases for all supported EVM networks",
+      mimeType: "application/json",
+      cacheHint: {
+        ttlMs: CACHE_TTL_MS,
+        cacheScope: CACHE_SCOPE
+      }
+    },
     async (uri) => {
       try {
         const networks = getSupportedNetworks();
         return {
           contents: [{
             uri: uri.href,
+            mimeType: "application/json",
             text: JSON.stringify({ supportedNetworks: networks }, null, 2)
           }]
         };

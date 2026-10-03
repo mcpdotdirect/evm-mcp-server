@@ -13,7 +13,7 @@ const require = createRequire(import.meta.url);
 const args = process.argv.slice(2);
 const httpMode = args.includes('--http') || args.includes('-h');
 
-console.log(`Starting EVM MCP Server in ${httpMode ? 'HTTP' : 'stdio'} mode...`);
+console.error(`Starting EVM MCP Server in ${httpMode ? 'HTTP' : 'stdio'} mode...`);
 
 // Determine which file to execute
 const scriptPath = resolve(__dirname, '../build', httpMode ? 'http-server.js' : 'index.js');
@@ -23,7 +23,7 @@ try {
   require.resolve(scriptPath);
   
   // Execute the server
-  const server = spawn('node', [scriptPath], {
+  const server = spawn(process.execPath, [scriptPath], {
     stdio: 'inherit',
     shell: false
   });
@@ -31,6 +31,10 @@ try {
   server.on('error', (err) => {
     console.error('Failed to start server:', err);
     process.exit(1);
+  });
+
+  server.on('exit', (code, signal) => {
+    process.exitCode = code ?? (signal ? 1 : 0);
   });
 
   // Handle clean shutdown
@@ -49,4 +53,4 @@ try {
   console.error('Please try reinstalling the package or contact the maintainers.');
   console.error(error);
   process.exit(1);
-} 
+}

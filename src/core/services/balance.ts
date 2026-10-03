@@ -1,8 +1,6 @@
 import { 
   formatEther,
   formatUnits,
-  type Address,
-  type Abi,
   getContract
 } from 'viem';
 import { getPublicClient } from './clients.js';
@@ -34,24 +32,6 @@ const erc20Abi = [
   }
 ] as const;
 
-// Standard ERC721 ABI (minimal for reading)
-const erc721Abi = [
-  {
-    inputs: [{ type: 'address', name: 'owner' }],
-    name: 'balanceOf',
-    outputs: [{ type: 'uint256' }],
-    stateMutability: 'view',
-    type: 'function'
-  },
-  {
-    inputs: [{ type: 'uint256', name: 'tokenId' }],
-    name: 'ownerOf',
-    outputs: [{ type: 'address' }],
-    stateMutability: 'view',
-    type: 'function'
-  }
-] as const;
-
 // Standard ERC1155 ABI (minimal for reading)
 const erc1155Abi = [
   {
@@ -67,7 +47,7 @@ const erc1155Abi = [
 ] as const;
 
 /**
- * Get the ETH balance for an address
+ * Get the native-token balance for an address
  * @param addressOrEns Ethereum address or ENS name
  * @param network Network name or chain ID
  * @returns Balance in wei and ether
@@ -136,63 +116,6 @@ export async function getERC20Balance(
 }
 
 /**
- * Check if an address owns a specific NFT
- * @param tokenAddressOrEns NFT contract address or ENS name
- * @param ownerAddressOrEns Owner address or ENS name
- * @param tokenId Token ID to check
- * @param network Network name or chain ID
- * @returns True if the address owns the NFT
- */
-export async function isNFTOwner(
-  tokenAddressOrEns: string,
-  ownerAddressOrEns: string,
-  tokenId: bigint,
-  network = 'ethereum'
-): Promise<boolean> {
-  // Resolve ENS names to addresses if needed
-  const tokenAddress = await resolveAddress(tokenAddressOrEns, network);
-  const ownerAddress = await resolveAddress(ownerAddressOrEns, network);
-  
-  try {
-    const actualOwner = await readContract({
-      address: tokenAddress,
-      abi: erc721Abi,
-      functionName: 'ownerOf',
-      args: [tokenId]
-    }, network) as Address;
-    
-    return actualOwner.toLowerCase() === ownerAddress.toLowerCase();
-  } catch (error: any) {
-    console.error(`Error checking NFT ownership: ${error.message}`);
-    return false;
-  }
-}
-
-/**
- * Get the number of NFTs owned by an address for a specific collection
- * @param tokenAddressOrEns NFT contract address or ENS name
- * @param ownerAddressOrEns Owner address or ENS name
- * @param network Network name or chain ID
- * @returns Number of NFTs owned
- */
-export async function getERC721Balance(
-  tokenAddressOrEns: string,
-  ownerAddressOrEns: string,
-  network = 'ethereum'
-): Promise<bigint> {
-  // Resolve ENS names to addresses if needed
-  const tokenAddress = await resolveAddress(tokenAddressOrEns, network);
-  const ownerAddress = await resolveAddress(ownerAddressOrEns, network);
-  
-  return readContract({
-    address: tokenAddress,
-    abi: erc721Abi,
-    functionName: 'balanceOf',
-    args: [ownerAddress]
-  }, network) as Promise<bigint>;
-}
-
-/**
  * Get the balance of an ERC1155 token for an address
  * @param tokenAddressOrEns ERC1155 contract address or ENS name
  * @param ownerAddressOrEns Owner address or ENS name
@@ -216,4 +139,4 @@ export async function getERC1155Balance(
     functionName: 'balanceOf',
     args: [ownerAddress, tokenId]
   }, network) as Promise<bigint>;
-} 
+}

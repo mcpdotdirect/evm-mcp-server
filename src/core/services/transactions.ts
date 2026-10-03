@@ -1,9 +1,4 @@
-import { 
-  type Address, 
-  type Hash, 
-  type TransactionReceipt,
-  type EstimateGasParameters
-} from 'viem';
+import { type Hash } from 'viem';
 import { getPublicClient } from './clients.js';
 
 /**
@@ -15,35 +10,10 @@ export async function getTransaction(hash: Hash, network = 'ethereum') {
 }
 
 /**
- * Get a transaction receipt by hash for a specific network
- */
-export async function getTransactionReceipt(hash: Hash, network = 'ethereum'): Promise<TransactionReceipt> {
-  const client = getPublicClient(network);
-  return await client.getTransactionReceipt({ hash });
-}
-
-/**
- * Get the transaction count for an address for a specific network
- */
-export async function getTransactionCount(address: Address, network = 'ethereum'): Promise<number> {
-  const client = getPublicClient(network);
-  const count = await client.getTransactionCount({ address });
-  return Number(count);
-}
-
-/**
- * Estimate gas for a transaction for a specific network
- */
-export async function estimateGas(params: EstimateGasParameters, network = 'ethereum'): Promise<bigint> {
-  const client = getPublicClient(network);
-  return await client.estimateGas(params);
-}
-
-/**
  * Get the chain ID for a specific network
  */
 export async function getChainId(network = 'ethereum'): Promise<number> {
   const client = getPublicClient(network);
   const chainId = await client.getChainId();
   return Number(chainId);
-} 
+}

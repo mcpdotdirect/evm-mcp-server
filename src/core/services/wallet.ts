@@ -6,7 +6,7 @@ import { privateKeyToAccount, mnemonicToAccount, type HDAccount, type PrivateKey
  *
  * Configuration options:
  * - EVM_PRIVATE_KEY: Hex private key (with or without 0x prefix)
- * - EVM_MNEMONIC: BIP-39 mnemonic phrase (12 or 24 words)
+ * - EVM_MNEMONIC: BIP-39 mnemonic phrase
  * - EVM_ACCOUNT_INDEX: Optional account index for HD wallet derivation (default: 0)
  */
 export const getConfiguredAccount = (): HDAccount | PrivateKeyAccount => {
@@ -34,7 +34,7 @@ export const getConfiguredAccount = (): HDAccount | PrivateKeyAccount => {
             "Neither EVM_PRIVATE_KEY nor EVM_MNEMONIC environment variable is set. " +
             "Configure one of them to enable write operations.\n" +
             "- EVM_PRIVATE_KEY: Your private key in hex format\n" +
-            "- EVM_MNEMONIC: Your 12 or 24 word mnemonic phrase\n" +
+            "- EVM_MNEMONIC: Your BIP-39 mnemonic phrase\n" +
             "- EVM_ACCOUNT_INDEX: (Optional) Account index for HD wallet (default: 0)"
         );
     }
@@ -90,7 +90,7 @@ export const getConfiguredWallet = (): { address: Address } => {
 
 /**
  * Sign an arbitrary message using the configured wallet
- * @param message The message to sign (can be a string or hex data)
+ * @param message The plain-text message to sign
  * @returns The signature as a hex string
  */
 export const signMessage = async (message: string): Promise<string> => {

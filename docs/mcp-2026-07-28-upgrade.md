@@ -1,0 +1,143 @@
+# MCP 2026-07-28 Upgrade
+
+This repository targets the final MCP `2026-07-28` specification through the released TypeScript SDK v2 packages. The release-candidate compatibility adapter has been removed.
+
+## Authoritative Sources
+
+- Specification: https://modelcontextprotocol.io/specification/2026-07-28
+- Changelog: https://modelcontextprotocol.io/specification/2026-07-28/changelog
+- SDK v1-to-v2 migration: https://github.com/modelcontextprotocol/typescript-sdk/blob/main/docs/migration/upgrade-to-v2.md
+- SDK `2026-07-28` support: https://github.com/modelcontextprotocol/typescript-sdk/blob/main/docs/migration/support-2026-07-28.md
+
+## Dependency Baseline
+
+Verified against the registry on September 13, 2026: the server, Node, Express, and test-client MCP packages are on stable `2.0.0`. Runtime dependencies include Express `5.2.1`, viem `2.56.5`, and Zod `4.6.4`; `bun.lock` pins the complete dependency graph. TypeScript `5.9.3` is a development dependency, not a peer requirement for consumers of the compiled CLI. Node types stay on the existing 22.x line rather than introducing Node 26-only APIs. The migration does not require the TypeScript 7 major upgrade.
+
+## Final Alignment
+
+- Replaced `@modelcontextprotocol/sdk` v1 with:
+  - `@modelcontextprotocol/server` v2
+  - `@modelcontextprotocol/node` v2
+  - `@modelcontextprotocol/express` v2
+  - Zod v4.2 or newer
+- Replaced the local JSON-RPC adapter with SDK-native `createMcpHandler` and `serveStdio`.
+- Kept stdio dual-era:
+  - MCP `2026-07-28` through `server/discover`
+  - MCP `2025-11-25` through the legacy `initialize` handshake
+- Kept HTTP modern-only and stateless:
+  - one `POST /mcp` request per exchange
+  - no `Mcp-Session-Id`
+  - request-scoped JSON or SSE responses
+- Added SDK-provided validation for the final standard headers:
+  - `MCP-Protocol-Version`
+  - `Mcp-Method`
+  - `Mcp-Name`
+- Added Host and Origin validation before the HTTP MCP handler.
+- Added application-level enforcement of the protocol-version header and both accepted response types, including `q=0` exclusions. These supplement SDK v2.0.0's header value validation.
+- Return JSON-RPC parse errors for malformed JSON and a JSON error for the 1 MB request limit; syntactically valid non-RPC JSON remains the SDK's responsibility.
+- Reject non-JSON or missing POST media types before reading the body. All accepted bodies pass through Express's 1 MB reader (including chunked and decompressed uploads); the Node adapter always receives a parsed value so its unbounded raw-stream fallback is never used. Unsupported encodings also return JSON-RPC errors.
+- Verified Base64 sentinel decoding for `Mcp-Name` and `x-mcp-header` parameter validation. Current EVM tools do not declare routing headers; an annotated test tool verifies missing, malformed, mismatched, and correctly encoded headers before handler execution.
+- Added MCP OAuth resource-server support for HTTP:
+  - localhost can run without authorization
+  - non-local binds and non-loopback allowed Host names fail closed unless OAuth is configured
+  - authorization-server metadata discovery and RFC 7662 token introspection
+  - baseline `mcp`, wallet-write `evm:write`, and signing `evm:sign` scopes
+- Configured all static list capabilities with `listChanged: false`; resource subscriptions remain disabled.
+- Configured one-hour public cache hints for discovery, static list operations, resource templates, and the public `evm://networks` resource. Unannotated future resources retain conservative cache defaults.
+- Migrated MCP-bound schemas to Zod 4 object schemas so the SDK emits JSON Schema 2020-12.
+- Added an `outputSchema` to all 25 tools. Every successful tool call returns equivalent JSON in both `structuredContent` and a pretty-printed text content block; bigint values are represented as decimal strings.
+- Added native MCP multi-round-trip confirmation to the six wallet-backed operations:
+  - `write_contract`
+  - `transfer_native`
+  - `transfer_erc20`
+  - `approve_token_spending`
+  - `sign_message`
+  - `sign_typed_data`
+- Integrity-protected confirmation continuation state with the SDK HMAC codec:
+  - binds the complete tool arguments and current HTTP bearer token
+  - expires after five minutes
+  - is consumed once per process before wallet access
+  - rejects tampering, argument changes, cross-token use, and replay
+- Bounded `wait_for_transaction` with `timeoutSeconds` from 1 through 90, defaulting to 90 seconds so it returns before the 120-second HTTP transport timeout.
+- Kept process diagnostics on `stderr`, including the npm CLI startup line, so stdio `stdout` contains protocol messages only.
+- The CLI uses its parent Node executable and propagates child startup failures. Server identity reads the package version at build time so version bumps update both entry points.
+
+## Protocol Contracts
+
+- `HeaderMismatch` is `-32020` and `UnsupportedProtocolVersion` is `-32022`.
+- `clientInfo` is optional request metadata.
+- Server identity is emitted as `_meta.io.modelcontextprotocol/serverInfo` on every modern result.
+- Request-scoped SSE and `subscriptions/listen` are owned by the official SDK.
+
+## Compatibility Decisions
+
+- HTTP remains strict `2026-07-28` to preserve the existing modern-only deployment decision.
+- Stdio serves both modern and legacy clients because local hosts commonly require gradual negotiation.
+- The static tool, prompt, and resource surfaces do not advertise change notifications.
+- `wait_for_transaction` remains a bounded synchronous tool. The Tasks extension is not advertised because the released v2 SDK removed its experimental server runtime; the extension currently has no supported TypeScript runtime integration to adopt.
+- Wallet-backed operations are not executed until the client accepts the tool's MCP `input_required` confirmation. Prompts and server instructions do not request a second conversational confirmation.
+- OAuth is HTTP-only. Stdio continues to obtain wallet and RPC credentials from its environment.
+
+## HTTP OAuth Configuration
+
+The HTTP process acts as an OAuth resource server; it does not issue access tokens. With the default local `MCP_HOST=127.0.0.1` and loopback-only allowed hosts, omitting `MCP_OAUTH_ISSUER_URL` keeps OAuth disabled. Setting it enables OAuth locally. Binding to a non-local interface or accepting a non-loopback `MCP_ALLOWED_HOSTS` entry requires OAuth and aborts startup if the configuration is incomplete. This includes a reverse proxy forwarding a public Host name to a loopback bind. HTTP resource and audience URLs are permitted only for local deployments and loopback URLs; all remote deployments require HTTPS.
+
+Required when OAuth is enabled:
+
+- `MCP_OAUTH_ISSUER_URL`: exact HTTPS authorization-server issuer without a query or fragment; copy the metadata `issuer` exactly, including any trailing slash
+- `MCP_PUBLIC_URL`: exact externally reachable MCP endpoint with the `/mcp` path and no query or fragment; non-local deployments require HTTPS
+- `MCP_OAUTH_CLIENT_ID`: RFC 7662 introspection client ID
+- `MCP_OAUTH_CLIENT_SECRET`: RFC 7662 introspection client secret
+
+Optional overrides:
+
+- `MCP_OAUTH_METADATA_URL`: authorization-server metadata URL; defaults to the RFC 8414 URL derived from the issuer, including correct well-known path insertion for issuers with a path
+- `MCP_OAUTH_INTROSPECTION_URL`: introspection endpoint when metadata does not publish `introspection_endpoint`
+- `MCP_OAUTH_AUDIENCE`: expected token audience/resource; defaults to `MCP_PUBLIC_URL`
+- `MCP_OAUTH_SCOPES`: additional advertised scopes; the minimal built-in `mcp` scope is always advertised
+- `MCP_OAUTH_REQUIRED_SCOPES`: additional scopes required for every MCP request; the baseline `mcp` scope is always required
+
+Introspection must return an active token with a client identity, expiration, the expected audience/resource, and appropriate scopes. In addition to the baseline scope, transaction and approval tools require `evm:write`; signing tools require `evm:sign`.
+
+RFC 7662 makes `client_id` optional. The verifier uses `client_id` when present and otherwise falls back to `sub`; `AuthInfo.extra.identityClaim` records which claim supplied the identity for future audit logging. Authorization decisions use scopes and audience, and confirmation state is bound to the bearer token.
+
+Authorization-server metadata must support the authorization-code response type and PKCE `S256`. The issuer, metadata URL, and every authorization-server endpoint must use HTTPS. Metadata discovery and introspection reject redirects and use a 10-second deadline.
+
+## Verification
+
+The automated MCP integration tests cover:
+
+- final `server/discover` shape and server identity metadata
+- optional `clientInfo`
+- deterministic tool listing and closed no-argument schemas
+- output schemas and structured tool results
+- confirmation requests and declines for all six wallet-backed operations, plus shared-helper coverage for argument binding, tamper rejection, and single-use replay prevention
+- bounded transaction waiting
+- cache hints on discovery, list, and resource results
+- resource reads and a read-only tool call
+- final `HeaderMismatch` and `UnsupportedProtocolVersion` error codes
+- real Express HTTP requests covering media types, required headers, Host/Origin rejection, parser errors, removed methods, and the SDK client
+- unfinished uploads proving unsupported media types are rejected before body completion, plus chunked and gzip uploads exceeding the decoded size limit
+- packaged Node CLI clients exercising tools, resource reads, and prompts over modern and legacy stdio, plus startup exit-code propagation
+- local authorization opt-out, remote fail-closed behavior, OAuth metadata validation, RFC 7662 introspection, audience checks, and scopes
+
+Release checks:
+
+```bash
+bun install --frozen-lockfile
+bun run check
+bun audit
+npm pack --dry-run --ignore-scripts
+```
+
+`bun run check` type-checks source and tests, builds both entry points, then runs the complete test suite (including the built CLI). `bun run test:mcp` runs the suite against existing build output. Tests use localhost listeners and fixture credentials; they do not submit blockchain transactions. CI runs the checks with Node 20, 22, 24, and 26 and Bun 1.4.2. The manual release workflow uses Node 24, verifies the bumped package before committing, and pushes the commit and new tag atomically without rewriting existing tags or branches. No npm release is triggered by a normal branch push.
+
+On macOS, Bun's `node:http` shim can fail the unfinished-upload and chunked/decompressed-body tests even with Bun 1.4.2. These assertions were verified against Node 24 and pass in Linux CI; macOS contributors can use a Linux environment for the full suite.
+
+## Follow-up Work
+
+These are enhancements, not compliance blockers:
+
+- Revisit the Tasks extension only after the official SDK provides a released server runtime for the final extension protocol.
+- Add deployment-specific rate limiting, audit logging, secret management, and authorization-server operational guidance before hosting a shared production endpoint.
+- Keep wallet confirmations on a single process, or route every continuation to the process that minted it. The HMAC key and consumed nonce map are process-local: another replica rejects the state and requests a fresh confirmation, and a restart invalidates pending confirmations. Protocol-stateless HTTP does not make confirmation handling stateless. Before supporting confirmations across replicas, implement both a shared key and atomic shared replay protection; sharing only the key permits replay on another replica.
