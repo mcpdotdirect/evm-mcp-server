@@ -5,26 +5,32 @@ import { resolve } from "node:path";
 import { SERVER_INFO } from "../src/server/protocol.js";
 
 describe("Packaged CLI stdio interoperability", () => {
-  test("reports HTTP startup failures to its caller", async () => {
-    const child = Bun.spawn(["node", resolve(import.meta.dir, "../bin/cli.js"), "--http"], {
-      env: { ...process.env, MCP_HOST: "0.0.0.0", MCP_OAUTH_ISSUER_URL: "" },
-      stdout: "pipe",
-      stderr: "pipe"
+  for (const deployment of [
+    { MCP_HOST: "0.0.0.0", MCP_ALLOWED_HOSTS: "mcp.example.test" },
+    { MCP_HOST: "127.0.0.1", MCP_ALLOWED_HOSTS: "localhost,mcp.example.test" },
+    { MCP_HOST: "127.0.0.1", MCP_ALLOWED_HOSTS: "https://mcp.example.test:443" }
+  ]) {
+    test(`reports HTTP startup failures for ${deployment.MCP_HOST} with ${deployment.MCP_ALLOWED_HOSTS}`, async () => {
+      const child = Bun.spawn(["node", resolve(import.meta.dir, "../bin/cli.js"), "--http"], {
+        env: { ...process.env, ...deployment, MCP_OAUTH_ISSUER_URL: "" },
+        stdout: "pipe",
+        stderr: "pipe"
+      });
+      try {
+        const [exitCode, stdout, stderr] = await Promise.all([
+          child.exited,
+          new Response(child.stdout).text(),
+          new Response(child.stderr).text()
+        ]);
+        expect(exitCode).toBe(1);
+        expect(stdout).toBe("");
+        expect(stderr).toContain("MCP_OAUTH_ISSUER_URL is required");
+      } finally {
+        child.kill();
+        await child.exited;
+      }
     });
-    try {
-      const [exitCode, stdout, stderr] = await Promise.all([
-        child.exited,
-        new Response(child.stdout).text(),
-        new Response(child.stderr).text()
-      ]);
-      expect(exitCode).toBe(1);
-      expect(stdout).toBe("");
-      expect(stderr).toContain("MCP_OAUTH_ISSUER_URL is required");
-    } finally {
-      child.kill();
-      await child.exited;
-    }
-  });
+  }
 
   for (const era of ["modern", "legacy"] as const) {
     test(`negotiates ${era} and serves tools, resources and prompts`, async () => {

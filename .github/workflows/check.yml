@@ -26,5 +26,7 @@ jobs:
         run: bun install --frozen-lockfile
       - name: Check types, build and test both transports
         run: bun run check
+      - name: Audit locked dependencies
+        run: bun audit
       - name: Verify package contents
         run: npm pack --dry-run --ignore-scripts

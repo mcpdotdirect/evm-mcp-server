@@ -47,6 +47,8 @@ function canonicalize(value: unknown): unknown {
 /**
  * HMAC-protect MCP request state and bind it to the current request and bearer token.
  * A process-local random key intentionally invalidates pending confirmations on restart.
+ * Continuations must return to the same process; replicas do not share this key
+ * or the consumed nonce map. See the deployment guidance in the upgrade document.
  */
 export const confirmationRequestStateCodec =
   createRequestStateCodec<ConfirmationRequestState>({

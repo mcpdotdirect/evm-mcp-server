@@ -83,6 +83,12 @@ jobs:
       - name: Check types, build and test before release
         run: bun run check
 
+      - name: Audit locked dependencies
+        run: bun audit
+
+      - name: Verify package contents
+        run: npm pack --dry-run --ignore-scripts
+
       - name: Commit and tag the verified release
         run: |
           git add package.json bun.lock CHANGELOG.md
@@ -104,5 +110,4 @@ jobs:
         run: npm publish --ignore-scripts --access public --provenance --tag "$DIST_TAG"
         env:
           DIST_TAG: ${{ inputs.dist_tag || 'latest' }}
-          # Restored the token here to ensure it works
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

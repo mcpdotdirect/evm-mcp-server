@@ -188,10 +188,9 @@ cd evm-mcp-server
 
 # Install dependencies with Bun
 bun install --frozen-lockfile
-
-# Or with npm
-npm install
 ```
+
+Contributors should use Bun with the committed `bun.lock` to install the same dependency graph as CI. To use the published package with npm, see the npx instructions below.
 
 ## ⚙️ Configuration
 
@@ -274,7 +273,7 @@ Allowed browser origins receive CORS headers on responses, including OAuth chall
 
 #### HTTP OAuth
 
-The HTTP process is an OAuth resource server; it does not issue access tokens. OAuth is optional only when `MCP_HOST` is local (`127.0.0.1`, `localhost`, or `::1`). If `MCP_OAUTH_ISSUER_URL` is set, OAuth is enabled even for a local bind. A non-local bind fails during startup unless OAuth is fully configured.
+The HTTP process is an OAuth resource server; it does not issue access tokens. OAuth is optional only when `MCP_HOST` is local (`127.0.0.1`, `localhost`, or `::1`) and all `MCP_ALLOWED_HOSTS` entries are loopback hostnames. If `MCP_OAUTH_ISSUER_URL` is set, OAuth is enabled even for a local bind. A non-local bind or a non-loopback allowed Host name fails during startup unless OAuth is fully configured, including when a reverse proxy forwards to a local bind. HTTP resource and audience URLs are allowed only for a local deployment and loopback URLs; remote deployments require HTTPS.
 
 Required when OAuth is enabled:
 
@@ -299,13 +298,15 @@ The introspection response must identify an active, unexpired token for this ser
 
 Authorization-server metadata must advertise the authorization-code response type and PKCE `S256`; the issuer, metadata URL, and all authorization-server endpoints must use HTTPS. Metadata and token-introspection requests reject redirects and time out after 10 seconds.
 
+Copy `MCP_OAUTH_ISSUER_URL` exactly from the provider's metadata `issuer` field. A bare origin and an origin ending in `/` are different issuer identifiers.
+
 Example remote configuration:
 
 ```bash
 export MCP_HOST="0.0.0.0"
 export MCP_ALLOWED_HOSTS="mcp.example.com"
 export MCP_ALLOWED_ORIGINS="https://app.example.com"
-export MCP_OAUTH_ISSUER_URL="https://auth.example.com/"
+export MCP_OAUTH_ISSUER_URL="https://auth.example.com" # Must exactly match the provider's metadata issuer
 export MCP_PUBLIC_URL="https://mcp.example.com/mcp"
 export MCP_OAUTH_CLIENT_ID="evm-mcp-resource-server"
 export MCP_OAUTH_CLIENT_SECRET="..."

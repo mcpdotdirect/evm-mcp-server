@@ -254,6 +254,22 @@ const confirmationSchema = z.object({
   confirm: z.boolean().describe("Set to true to authorize this exact operation.")
 });
 
+async function requestConfirmation(
+  ctx: ServerContext,
+  operationDigest: string,
+  message: string
+): Promise<InputRequiredResult> {
+  return inputRequired({
+    inputRequests: {
+      confirmation: inputRequired.elicit({
+        message,
+        requestedSchema: confirmationSchema
+      })
+    },
+    requestState: await mintConfirmationRequestState(operationDigest, ctx)
+  });
+}
+
 /**
  * Require an explicit MCP input response before a wallet-backed operation.
  * A declined or cancelled request is terminal and never re-prompts.
@@ -271,15 +287,7 @@ async function requireConfirmation(
     !isConfirmationRequestState(requestState)
     || requestState.operationDigest !== operationDigest
   ) {
-    return inputRequired({
-      inputRequests: {
-        confirmation: inputRequired.elicit({
-          message,
-          requestedSchema: confirmationSchema
-        })
-      },
-      requestState: await mintConfirmationRequestState(operationDigest, ctx)
-    });
+    return requestConfirmation(ctx, operationDigest, message);
   }
 
   if (!consumeConfirmationRequestState(requestState)) {
@@ -315,15 +323,7 @@ async function requireConfirmation(
   }
 
   if (answer?.confirm !== true) {
-    return inputRequired({
-      inputRequests: {
-        confirmation: inputRequired.elicit({
-          message,
-          requestedSchema: confirmationSchema
-        })
-      },
-      requestState: await mintConfirmationRequestState(operationDigest, ctx)
-    });
+    return requestConfirmation(ctx, operationDigest, message);
   }
 
   return undefined;
@@ -1594,17 +1594,17 @@ export function registerEVMTools(server: McpServer) {
       }
     },
     async ({ message }, ctx) => {
-      const confirmation = await requireConfirmation(
-        ctx,
-        "sign_message",
-        { message },
-        `Sign this message with the configured wallet?\n\n${message}`
-      );
-      if (confirmation) {
-        return confirmation;
-      }
-
       try {
+        const confirmation = await requireConfirmation(
+          ctx,
+          "sign_message",
+          { message },
+          `Sign this message with the configured wallet?\n\n${message}`
+        );
+        if (confirmation) {
+          return confirmation;
+        }
+
         const senderAddress = getWalletAddressFromKey();
         const signature = await services.signMessage(message);
         return createToolResult({

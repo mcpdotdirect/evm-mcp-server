@@ -1,5 +1,5 @@
 import { getSupportedChainCount, getSupportedNetworks } from "../core/chains.js";
-import { loadOAuthResourceServerConfiguration } from "./auth.js";
+import { isLoopbackHostname, loadOAuthResourceServerConfiguration } from "./auth.js";
 import { createHttpApp } from "./http-app.js";
 import { MODERN_PROTOCOL_VERSION, SERVER_INFO } from "./protocol.js";
 
@@ -26,18 +26,15 @@ function configuredHostnames(variableName: string, fallback: string[]): string[]
   });
 }
 
-function isLocalHost(host: string): boolean {
-  return host === "127.0.0.1" || host === "localhost" || host === "::1";
-}
-
-const defaultHostnames = isLocalHost(HOST) ? LOCAL_HOSTNAMES : [HOST];
+const defaultHostnames = isLoopbackHostname(HOST) ? LOCAL_HOSTNAMES : [HOST];
 const allowedHostnames = configuredHostnames("MCP_ALLOWED_HOSTS", defaultHostnames);
 const allowedOriginHostnames = configuredHostnames("MCP_ALLOWED_ORIGINS", defaultHostnames);
 
 console.error(`Configured to listen on ${HOST}:${PORT}`);
 
 const oauthConfiguration = await loadOAuthResourceServerConfiguration({
-  isLocalHost: isLocalHost(HOST)
+  isLocalHost: isLoopbackHostname(HOST),
+  allowedHostnames
 }).catch((error: unknown) => {
   console.error(
     `HTTP authorization configuration error: ${error instanceof Error ? error.message : String(error)}`
@@ -56,7 +53,7 @@ const httpServer = app.listen(PORT, HOST, () => {
   console.error(`MCP endpoint: http://${HOST}:${PORT}/mcp`);
   console.error(`Health check: http://${HOST}:${PORT}/health`);
   console.error(`Protocol: MCP ${MODERN_PROTOCOL_VERSION} (stateless Streamable HTTP)`);
-  console.error(`Authorization: ${oauthConfiguration ? "OAuth bearer tokens required" : "disabled for localhost-only binding"}`);
+  console.error(`Authorization: ${oauthConfiguration ? "OAuth bearer tokens required" : "disabled for local binding and loopback-only allowed hosts"}`);
   console.error(
     `Supported chains: ${getSupportedChainCount()} (${getSupportedNetworks().length} configured names and aliases)`
   );

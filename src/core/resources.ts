@@ -1,5 +1,6 @@
 import { McpServer } from "@modelcontextprotocol/server";
 import { getSupportedNetworks } from "./chains.js";
+import { CACHE_SCOPE, CACHE_TTL_MS } from "../server/protocol.js";
 
 /**
  * Register EVM-related resources with the MCP server
@@ -21,8 +22,8 @@ export function registerEVMResources(server: McpServer) {
       description: "Get the configured names and aliases for all supported EVM networks",
       mimeType: "application/json",
       cacheHint: {
-        ttlMs: 60 * 60 * 1000,
-        cacheScope: "public"
+        ttlMs: CACHE_TTL_MS,
+        cacheScope: CACHE_SCOPE
       }
     },
     async (uri) => {

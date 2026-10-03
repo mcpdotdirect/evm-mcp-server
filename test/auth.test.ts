@@ -109,8 +109,51 @@ describe("HTTP OAuth resource-server configuration", () => {
       },
       isLocalHost: false
     })).rejects.toThrow(
-      "MCP_PUBLIC_URL must use HTTPS unless it is a loopback URL"
+      "MCP_PUBLIC_URL must use HTTPS unless the deployment is local and it is a loopback URL"
     );
+  });
+
+  test("requires OAuth for a public proxy hostname on a local bind", async () => {
+    await expect(loadOAuthResourceServerConfiguration({
+      environment: {},
+      allowedHostnames: ["localhost", "mcp.example.test"],
+      isLocalHost: true
+    })).rejects.toThrow("MCP_ALLOWED_HOSTS includes a non-loopback hostname");
+
+    await expect(loadOAuthResourceServerConfiguration({
+      environment: {},
+      allowedHostnames: ["localhost", "127.0.0.1", "[::1]"],
+      isLocalHost: true
+    })).resolves.toBeUndefined();
+  });
+
+  test("permits HTTP loopback resource and audience URLs only for local deployments", async () => {
+    for (const hostname of ["localhost", "127.0.0.1", "[::1]"]) {
+      const loopbackUrl = `http://${hostname}:3001/mcp`;
+      for (const variable of ["MCP_PUBLIC_URL", "MCP_OAUTH_AUDIENCE"]) {
+        for (const deployment of [
+          { isLocalHost: false },
+          { isLocalHost: true, allowedHostnames: ["mcp.example.test"] }
+        ]) {
+          await expect(loadOAuthResourceServerConfiguration({
+            environment: oauthEnvironment({ [variable]: loopbackUrl }),
+            fetchImplementation: async () => Response.json(authorizationServerMetadata()),
+            ...deployment
+          })).rejects.toThrow(`${variable} must use HTTPS`);
+        }
+      }
+
+      const configuration = await loadOAuthResourceServerConfiguration({
+        environment: oauthEnvironment({
+          MCP_PUBLIC_URL: loopbackUrl,
+          MCP_OAUTH_AUDIENCE: loopbackUrl
+        }),
+        fetchImplementation: async () => Response.json(authorizationServerMetadata()),
+        allowedHostnames: [hostname],
+        isLocalHost: true
+      });
+      expect(configuration?.resourceServerUrl.href).toBe(loopbackUrl);
+    }
   });
 
   test("requires HTTPS for authorization-server URLs even on localhost", async () => {
@@ -221,7 +264,7 @@ describe("HTTP OAuth resource-server configuration", () => {
       expiresAt
     }));
     expect(authInfo.resource?.href).toBe(RESOURCE_SERVER);
-    expect(authInfo.extra).toEqual({ issuer: ISSUER });
+    expect(authInfo.extra).toEqual({ issuer: ISSUER, identityClaim: "client_id" });
 
     const introspectionRequest = requests.find(
       request => request.url === INTROSPECTION_ENDPOINT
@@ -335,6 +378,40 @@ describe("HTTP OAuth resource-server configuration", () => {
     });
   });
 
+  test("preserves the optional client_id fallback and records the identity claim", async () => {
+    let identity: Record<string, string> = { sub: "end-user" };
+    const configuration = await loadOAuthResourceServerConfiguration({
+      environment: oauthEnvironment(),
+      fetchImplementation: async input => {
+        if (String(input) !== INTROSPECTION_ENDPOINT) {
+          return Response.json(authorizationServerMetadata());
+        }
+        return Response.json({
+          active: true,
+          ...identity,
+          scope: BASE_MCP_SCOPE,
+          exp: Math.floor(Date.now() / 1000) + 300,
+          aud: RESOURCE_SERVER
+        });
+      },
+      isLocalHost: false
+    });
+    if (!configuration) {
+      throw new Error("Expected OAuth configuration");
+    }
+
+    expect(await configuration.verifier.verifyAccessToken("subject-token"))
+      .toMatchObject({ clientId: "end-user", extra: { identityClaim: "sub" } });
+
+    identity = { client_id: "mcp-client", sub: "end-user" };
+    expect(await configuration.verifier.verifyAccessToken("client-token"))
+      .toMatchObject({ clientId: "mcp-client", extra: { identityClaim: "client_id" } });
+
+    identity = {};
+    await expect(configuration.verifier.verifyAccessToken("missing-identity"))
+      .rejects.toMatchObject({ code: OAuthErrorCode.InvalidToken });
+  });
+
   test("requires OAuth 2.1 authorization metadata before republishing it", async () => {
     await expect(loadOAuthResourceServerConfiguration({
       environment: oauthEnvironment(),
@@ -437,5 +514,30 @@ describe("HTTP OAuth resource-server configuration", () => {
     })).rejects.toThrow(
       "OAuth metadata issuer does not match MCP_OAUTH_ISSUER_URL"
     );
+  });
+
+  test("matches issuer identifiers exactly and explains trailing-slash mismatches", async () => {
+    const bareIssuer = ISSUER.slice(0, -1);
+    for (const [configuredIssuer, metadataIssuer] of [
+      [ISSUER, bareIssuer],
+      [bareIssuer, ISSUER]
+    ] as const) {
+      await expect(loadOAuthResourceServerConfiguration({
+        environment: oauthEnvironment({ MCP_OAUTH_ISSUER_URL: configuredIssuer }),
+        fetchImplementation: async () => Response.json(
+          authorizationServerMetadata({ issuer: metadataIssuer })
+        ),
+        isLocalHost: false
+      })).rejects.toThrow("copy the issuer exactly, including any trailing slash");
+    }
+
+    const configuration = await loadOAuthResourceServerConfiguration({
+      environment: oauthEnvironment({ MCP_OAUTH_ISSUER_URL: bareIssuer }),
+      fetchImplementation: async () => Response.json(
+        authorizationServerMetadata({ issuer: bareIssuer })
+      ),
+      isLocalHost: false
+    });
+    expect(configuration?.oauthMetadata.issuer).toBe(bareIssuer);
   });
 });

@@ -123,7 +123,7 @@ function canonicalResourceUrl(value: URL): URL {
   return new URL(value);
 }
 
-function isLoopbackHostname(hostname: string): boolean {
+export function isLoopbackHostname(hostname: string): boolean {
   return hostname === "localhost"
     || hostname === "127.0.0.1"
     || hostname === "[::1]"
@@ -136,12 +136,12 @@ function requireHttpsAuthorizationUrl(value: URL, label: string): void {
   }
 }
 
-function requireSecureResourceUrl(value: URL, label: string): void {
+function requireSecureResourceUrl(value: URL, label: string, isLocalDeployment: boolean): void {
   if (
     value.protocol !== "https:"
-    && !(value.protocol === "http:" && isLoopbackHostname(value.hostname))
+    && !(isLocalDeployment && value.protocol === "http:" && isLoopbackHostname(value.hostname))
   ) {
-    throw new Error(`${label} must use HTTPS unless it is a loopback URL`);
+    throw new Error(`${label} must use HTTPS unless the deployment is local and it is a loopback URL`);
   }
 }
 
@@ -310,7 +310,8 @@ function createIntrospectionVerifier(options: {
         expiresAt: tokenInfo.exp,
         resource: options.resourceServerUrl,
         extra: {
-          issuer: options.expectedIssuer
+          issuer: options.expectedIssuer,
+          identityClaim: tokenInfo.client_id !== undefined ? "client_id" : "sub"
         }
       };
     }
@@ -320,10 +321,12 @@ function createIntrospectionVerifier(options: {
 /**
  * Load the OAuth resource-server configuration for Streamable HTTP.
  *
- * Localhost remains usable without OAuth. Binding to a non-local interface
- * requires an external OAuth authorization server and RFC 7662 introspection.
+ * A local bind with only loopback allowed hosts remains usable without OAuth.
+ * Remote binds and public proxy hostnames require an external OAuth authorization
+ * server and RFC 7662 introspection.
  */
 export async function loadOAuthResourceServerConfiguration(options: {
+  allowedHostnames?: string[];
   environment?: OAuthEnvironment;
   fetchImplementation?: FetchImplementation;
   isLocalHost: boolean;
@@ -331,14 +334,16 @@ export async function loadOAuthResourceServerConfiguration(options: {
   const environment = options.environment ?? process.env;
   const fetchImplementation = options.fetchImplementation ?? fetch;
   const issuer = environment.MCP_OAUTH_ISSUER_URL?.trim();
+  const isLocalDeployment = options.isLocalHost
+    && (options.allowedHostnames ?? []).every(isLoopbackHostname);
 
   if (!issuer) {
-    if (options.isLocalHost) {
+    if (isLocalDeployment) {
       return undefined;
     }
 
     throw new Error(
-      "MCP_OAUTH_ISSUER_URL is required when MCP_HOST binds to a non-local interface"
+      "MCP_OAUTH_ISSUER_URL is required when MCP_HOST binds to a non-local interface or MCP_ALLOWED_HOSTS includes a non-loopback hostname"
     );
   }
 
@@ -353,7 +358,7 @@ export async function loadOAuthResourceServerConfiguration(options: {
   if (publicUrl.pathname !== "/mcp" || publicUrl.search || publicUrl.hash) {
     throw new Error("MCP_PUBLIC_URL must be the exact public MCP endpoint ending in /mcp, without a query or fragment");
   }
-  requireSecureResourceUrl(publicUrl, "MCP_PUBLIC_URL");
+  requireSecureResourceUrl(publicUrl, "MCP_PUBLIC_URL", isLocalDeployment);
 
   const metadataUrl = environment.MCP_OAUTH_METADATA_URL?.trim()
     ?? getAuthorizationServerMetadataUrl(issuerUrl).href;
@@ -382,7 +387,9 @@ export async function loadOAuthResourceServerConfiguration(options: {
 
   const metadata = oauthMetadataSchema.parse(await metadataResponse.json());
   if (metadata.issuer !== expectedIssuer) {
-    throw new Error("OAuth metadata issuer does not match MCP_OAUTH_ISSUER_URL");
+    throw new Error(
+      "OAuth metadata issuer does not match MCP_OAUTH_ISSUER_URL; copy the issuer exactly, including any trailing slash"
+    );
   }
   validateAuthorizationServerMetadata(metadata);
 
@@ -415,7 +422,7 @@ export async function loadOAuthResourceServerConfiguration(options: {
   const expectedAudienceUrl = canonicalResourceUrl(new URL(
     environment.MCP_OAUTH_AUDIENCE?.trim() ?? publicUrl.href
   ));
-  requireSecureResourceUrl(expectedAudienceUrl, "MCP_OAUTH_AUDIENCE");
+  requireSecureResourceUrl(expectedAudienceUrl, "MCP_OAUTH_AUDIENCE", isLocalDeployment);
   const expectedAudience = expectedAudienceUrl.href;
 
   return {

@@ -23,7 +23,7 @@ import {
   type OAuthResourceServerConfiguration
 } from "./auth.js";
 import createServer from "./server.js";
-import { CACHE_SCOPE, CACHE_TTL_MS, MODERN_PROTOCOL_VERSION, SERVER_INFO } from "./protocol.js";
+import { CACHE_SCOPE, CACHE_TTL_MS, HEADER_MISMATCH_ERROR_CODE, MODERN_PROTOCOL_VERSION, SERVER_INFO } from "./protocol.js";
 
 export type HttpAppOptions = {
   allowedHostnames: string[];
@@ -140,7 +140,7 @@ export function createHttpApp(options: HttpAppOptions): HttpApp {
         jsonrpc: "2.0",
         ...(typeof req.body?.id === "string" || typeof req.body?.id === "number"
           ? { id: req.body.id } : {}),
-        error: { code: -32020, message: "Missing MCP-Protocol-Version header" }
+        error: { code: HEADER_MISMATCH_ERROR_CODE, message: "Missing MCP-Protocol-Version header" }
       });
       return;
     }
